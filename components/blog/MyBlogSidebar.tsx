@@ -67,13 +67,17 @@ export default function MyBlogSidebar({ user }: MyBlogSidebarProps) {
   }
 
   // 블로그가 있는 경우
+  const kakaoProfileImage = user?.user_metadata?.avatar_url || user?.user_metadata?.picture
+
   if (blog) {
+    const profileImage = blog.thumbnail_url || kakaoProfileImage
+
     return (
       <div className="rounded-2xl border border-black/10 p-6 dark:border-white/10">
         <div className="flex items-center gap-3">
-          {blog.thumbnail_url ? (
+          {profileImage ? (
             <img
-              src={blog.thumbnail_url}
+              src={profileImage}
               alt={blog.name}
               className="h-12 w-12 rounded-xl object-cover"
             />

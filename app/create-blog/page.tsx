@@ -1,15 +1,18 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import type { User } from '@supabase/supabase-js'
 
 export default function CreateBlogPage() {
   const router = useRouter()
+  const fileInputRef = useRef<HTMLInputElement>(null)
   const [user, setUser] = useState<User | null>(null)
   const [name, setName] = useState('')
   const [description, setDescription] = useState('')
+  const [imageFile, setImageFile] = useState<File | null>(null)
+  const [imagePreview, setImagePreview] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
   const [checkingAuth, setCheckingAuth] = useState(true)
@@ -43,6 +46,54 @@ export default function CreateBlogPage() {
     checkUser()
   }, [router])
 
+  const handleImageSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (!file) return
+
+    const allowedTypes = ['image/jpeg', 'image/png', 'image/webp']
+    if (!allowedTypes.includes(file.type)) {
+      setError('JPG, PNG, WEBP 파일만 업로드할 수 있습니다')
+      return
+    }
+
+    if (file.size > 5 * 1024 * 1024) {
+      setError('이미지 크기는 5MB 이하여야 합니다')
+      return
+    }
+
+    setImageFile(file)
+    setImagePreview(URL.createObjectURL(file))
+    setError('')
+  }
+
+  const handleImageRemove = () => {
+    setImageFile(null)
+    if (imagePreview) {
+      URL.revokeObjectURL(imagePreview)
+      setImagePreview(null)
+    }
+    if (fileInputRef.current) {
+      fileInputRef.current.value = ''
+    }
+  }
+
+  const uploadImage = async (file: File): Promise<string | null> => {
+    const formData = new FormData()
+    formData.append('file', file)
+
+    const response = await fetch('/api/upload', {
+      method: 'POST',
+      body: formData,
+    })
+
+    if (!response.ok) {
+      throw new Error('이미지 업로드에 실패했습니다')
+    }
+
+    const data = await response.json()
+    return data.url
+  }
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
 
@@ -56,23 +107,35 @@ export default function CreateBlogPage() {
     setLoading(true)
     setError('')
 
-    const supabase = createClient()
+    try {
+      let thumbnailUrl: string | null = null
 
-    const { error: insertError } = await supabase
-      .from('blogs')
-      .insert({
-        user_id: user.id,
-        name: name.trim(),
-        description: description.trim() || null,
-      })
+      if (imageFile) {
+        thumbnailUrl = await uploadImage(imageFile)
+      }
 
-    if (insertError) {
-      setError('블로그 생성에 실패했습니다')
+      const supabase = createClient()
+
+      const { error: insertError } = await supabase
+        .from('blogs')
+        .insert({
+          user_id: user.id,
+          name: name.trim(),
+          description: description.trim() || null,
+          thumbnail_url: thumbnailUrl,
+        })
+
+      if (insertError) {
+        setError('블로그 생성에 실패했습니다')
+        setLoading(false)
+        return
+      }
+
+      router.push('/')
+    } catch (err) {
+      setError(err instanceof Error ? err.message : '오류가 발생했습니다')
       setLoading(false)
-      return
     }
-
-    router.push('/')
   }
 
   if (checkingAuth) {
@@ -101,6 +164,53 @@ export default function CreateBlogPage() {
         </p>
 
         <form onSubmit={handleSubmit} className="mt-10 space-y-6">
+          <div>
+            <label className="block text-sm font-medium text-black dark:text-white">
+              프로필 이미지
+            </label>
+            <div className="mt-3 flex items-center gap-4">
+              {imagePreview ? (
+                <div className="relative">
+                  <img
+                    src={imagePreview}
+                    alt="Preview"
+                    className="h-20 w-20 rounded-xl object-cover"
+                  />
+                  <button
+                    type="button"
+                    onClick={handleImageRemove}
+                    className="absolute -right-2 -top-2 flex h-6 w-6 items-center justify-center rounded-full bg-black text-white dark:bg-white dark:text-black"
+                  >
+                    <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                    </svg>
+                  </button>
+                </div>
+              ) : (
+                <button
+                  type="button"
+                  onClick={() => fileInputRef.current?.click()}
+                  className="flex h-20 w-20 items-center justify-center rounded-xl border-2 border-dashed border-black/20 text-black/40 transition-colors hover:border-black/40 hover:text-black/60 dark:border-white/20 dark:text-white/40 dark:hover:border-white/40 dark:hover:text-white/60"
+                >
+                  <svg className="h-8 w-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 4v16m8-8H4" />
+                  </svg>
+                </button>
+              )}
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept="image/jpeg,image/png,image/webp"
+                onChange={handleImageSelect}
+                className="hidden"
+              />
+              <div className="text-sm text-black/50 dark:text-white/50">
+                <p>JPG, PNG, WEBP (최대 5MB)</p>
+                <p className="mt-1">선택사항</p>
+              </div>
+            </div>
+          </div>
+
           <div>
             <label className="block text-sm font-medium text-black dark:text-white">
               블로그 이름

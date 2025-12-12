@@ -57,26 +57,26 @@ export default function UserMenu({ user }: UserMenuProps) {
       </button>
 
       {isOpen && (
-        <div className="absolute right-0 top-full z-50 mt-3 min-w-72 rounded-2xl border border-black/10 bg-white p-5 shadow-xl dark:border-white/10 dark:bg-zinc-900">
+        <div className="absolute right-0 top-full z-50 mt-3 w-max min-w-56 rounded-2xl border border-black/10 bg-white p-5 shadow-xl dark:border-white/10 dark:bg-zinc-900">
           {/* 프로필 정보 */}
           <div className="flex items-center gap-3">
             {profileImage ? (
               <img
                 src={profileImage}
                 alt={nickname}
-                className="h-12 w-12 rounded-full object-cover"
+                className="h-12 w-12 shrink-0 rounded-full object-cover"
               />
             ) : (
-              <div className="flex h-12 w-12 items-center justify-center rounded-full bg-black text-lg font-medium text-white dark:bg-white dark:text-black">
+              <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-black text-lg font-medium text-white dark:bg-white dark:text-black">
                 {nickname.charAt(0)}
               </div>
             )}
-            <div className="min-w-0 flex-1">
-              <p className="truncate text-base font-semibold text-black dark:text-white">
+            <div>
+              <p className="text-base font-semibold text-black dark:text-white">
                 {nickname}
               </p>
               {email && (
-                <p className="text-sm text-black/50 dark:text-white/50">
+                <p className="whitespace-nowrap text-sm text-black/50 dark:text-white/50">
                   {email}
                 </p>
               )}
