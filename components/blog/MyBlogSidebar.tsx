@@ -98,18 +98,26 @@ export default function MyBlogSidebar({ user }: MyBlogSidebarProps) {
           </div>
         </div>
 
-        <div className="mt-5 space-y-2">
+        <div className="mt-5 flex items-center justify-center gap-3 text-sm">
           <a
             href={`/blog/${blog.id}`}
-            className="block w-full rounded-lg border border-black/10 py-2 text-center text-sm font-medium text-black hover:bg-black/5 dark:border-white/10 dark:text-white dark:hover:bg-white/5"
+            className="font-medium text-black hover:text-black/70 dark:text-white dark:hover:text-white/70"
           >
-            블로그 보기
+            내 블로그
           </a>
+          <span className="text-black/30 dark:text-white/30">|</span>
           <a
             href="/write"
-            className="block w-full rounded-lg bg-black py-2 text-center text-sm font-medium text-white dark:bg-white dark:text-black"
+            className="font-medium text-black hover:text-black/70 dark:text-white dark:hover:text-white/70"
           >
-            새 글 작성
+            글쓰기
+          </a>
+          <span className="text-black/30 dark:text-white/30">|</span>
+          <a
+            href={`/blog/${blog.id}/settings`}
+            className="font-medium text-black hover:text-black/70 dark:text-white dark:hover:text-white/70"
+          >
+            관리
           </a>
         </div>
       </div>
