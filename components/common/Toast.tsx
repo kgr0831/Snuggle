@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState, useRef } from 'react'
+import { useEffect, useState } from 'react'
 
 interface ToastProps {
   message: string
@@ -10,65 +10,58 @@ interface ToastProps {
 }
 
 export default function Toast({ message, type = 'success', isVisible, onClose }: ToastProps) {
-  const [visible, setVisible] = useState(false)
-  const [animate, setAnimate] = useState(false)
-  const timeoutRef = useRef<NodeJS.Timeout | null>(null)
+  const [items, setItems] = useState<{ id: number; message: string; type: 'success' | 'error'; leaving: boolean }[]>([])
 
   useEffect(() => {
-    if (isVisible) {
-      // 이전 타이머 클리어
-      if (timeoutRef.current) {
-        clearTimeout(timeoutRef.current)
-      }
+    if (isVisible && message) {
+      const id = Date.now()
+      setItems(prev => [...prev, { id, message, type, leaving: false }])
 
-      setVisible(true)
-      // 다음 프레임에서 애니메이션 시작
-      setTimeout(() => setAnimate(true), 10)
-
-      // 2.5초 후 사라지기 시작
-      timeoutRef.current = setTimeout(() => {
-        setAnimate(false)
-        // 애니메이션 완료 후 숨기기
-        setTimeout(() => {
-          setVisible(false)
-          onClose()
-        }, 300)
+      // 2.5초 후 leaving 상태로
+      setTimeout(() => {
+        setItems(prev => prev.map(item =>
+          item.id === id ? { ...item, leaving: true } : item
+        ))
       }, 2500)
-    }
 
-    return () => {
-      if (timeoutRef.current) {
-        clearTimeout(timeoutRef.current)
-      }
+      // 3초 후 제거
+      setTimeout(() => {
+        setItems(prev => prev.filter(item => item.id !== id))
+        onClose()
+      }, 2800)
     }
   }, [isVisible, message])
 
-  if (!visible) return null
+  if (items.length === 0) return null
 
   return (
-    <div className="fixed bottom-6 left-1/2 z-50 -translate-x-1/2">
-      <div
-        className={`flex items-center gap-2 rounded-full px-5 py-3 shadow-lg transition-all duration-300 ease-out ${
-          animate
-            ? 'translate-y-0 opacity-100 scale-100'
-            : 'translate-y-3 opacity-0 scale-95'
-        } ${
-          type === 'success'
-            ? 'bg-black text-white dark:bg-white dark:text-black'
-            : 'bg-red-500 text-white'
-        }`}
-      >
-        {type === 'success' ? (
-          <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-          </svg>
-        ) : (
-          <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-          </svg>
-        )}
-        <span className="text-sm font-medium">{message}</span>
-      </div>
+    <div className="fixed bottom-6 left-1/2 z-50 flex -translate-x-1/2 flex-col gap-2">
+      {items.map(item => (
+        <div
+          key={item.id}
+          className={`flex items-center gap-2 rounded-full px-5 py-3 shadow-lg ${
+            item.type === 'success'
+              ? 'bg-black text-white dark:bg-white dark:text-black'
+              : 'bg-red-500 text-white'
+          }`}
+          style={{
+            animation: item.leaving
+              ? 'toastOut 0.3s ease-out forwards'
+              : 'toastIn 0.3s ease-out forwards'
+          }}
+        >
+          {item.type === 'success' ? (
+            <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+            </svg>
+          ) : (
+            <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+            </svg>
+          )}
+          <span className="text-sm font-medium">{item.message}</span>
+        </div>
+      ))}
     </div>
   )
 }

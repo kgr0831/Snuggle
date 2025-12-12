@@ -391,44 +391,30 @@ export default function BlogSettingsPage() {
                 <div className="mt-4">
                   <div className="flex items-start gap-6">
                     {/* 이미지 프리뷰 */}
-                    <div className="relative">
-                      <button
-                        type="button"
-                        onClick={() => fileInputRef.current?.click()}
-                        className="group relative h-28 w-28 shrink-0 overflow-hidden rounded-full"
-                      >
-                        {displayImage ? (
-                          <img
-                            src={displayImage}
-                            alt="Preview"
-                            className="h-full w-full object-cover"
-                          />
-                        ) : (
-                          <div className="flex h-full w-full items-center justify-center bg-black/5 text-3xl font-bold text-black/30 dark:bg-white/5 dark:text-white/30">
-                            {name.charAt(0) || '?'}
-                          </div>
-                        )}
-                        {/* 호버 오버레이 */}
-                        <div className="absolute inset-0 flex items-center justify-center bg-black/50 opacity-0 transition-opacity group-hover:opacity-100">
-                          <svg className="h-8 w-8 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" />
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M15 13a3 3 0 11-6 0 3 3 0 016 0z" />
-                          </svg>
+                    <button
+                      type="button"
+                      onClick={() => fileInputRef.current?.click()}
+                      className="group relative h-28 w-28 shrink-0 overflow-hidden rounded-full"
+                    >
+                      {displayImage ? (
+                        <img
+                          src={displayImage}
+                          alt="Preview"
+                          className="h-full w-full object-cover"
+                        />
+                      ) : (
+                        <div className="flex h-full w-full items-center justify-center bg-black/5 text-3xl font-bold text-black/30 dark:bg-white/5 dark:text-white/30">
+                          {name.charAt(0) || '?'}
                         </div>
-                      </button>
-                      {/* 삭제 버튼 */}
-                      {imagePreview && !imageRemoved && (
-                        <button
-                          type="button"
-                          onClick={handleImageRemove}
-                          className="absolute -right-1 -top-1 flex h-7 w-7 items-center justify-center rounded-full bg-red-500 text-white shadow-md transition-transform hover:scale-110"
-                        >
-                          <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                          </svg>
-                        </button>
                       )}
-                    </div>
+                      {/* 호버 오버레이 */}
+                      <div className="absolute inset-0 flex items-center justify-center bg-black/50 opacity-0 transition-opacity group-hover:opacity-100">
+                        <svg className="h-8 w-8 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" />
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M15 13a3 3 0 11-6 0 3 3 0 016 0z" />
+                        </svg>
+                      </div>
+                    </button>
                     <input
                       ref={fileInputRef}
                       type="file"
@@ -437,14 +423,24 @@ export default function BlogSettingsPage() {
                       className="hidden"
                     />
 
-                    {/* 안내 */}
-                    <div className="flex flex-col gap-2 pt-2">
-                      <p className="text-sm font-medium text-black dark:text-white">
-                        프로필 사진
-                      </p>
-                      <p className="text-xs text-black/40 dark:text-white/40">
-                        클릭하여 이미지 업로드
-                      </p>
+                    {/* 버튼 및 안내 */}
+                    <div className="flex flex-col gap-3 pt-2">
+                      <button
+                        type="button"
+                        onClick={() => fileInputRef.current?.click()}
+                        className="rounded-lg border border-black/10 px-4 py-2 text-sm font-medium text-black hover:bg-black/5 dark:border-white/10 dark:text-white dark:hover:bg-white/5"
+                      >
+                        이미지 업로드
+                      </button>
+                      {imagePreview && !imageRemoved && (
+                        <button
+                          type="button"
+                          onClick={handleImageRemove}
+                          className="rounded-lg px-4 py-2 text-sm font-medium text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20"
+                        >
+                          이미지 삭제
+                        </button>
+                      )}
                       <p className="text-xs text-black/40 dark:text-white/40">
                         JPG, PNG, WEBP · 최대 5MB
                       </p>
