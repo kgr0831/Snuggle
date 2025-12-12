@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import type { User } from '@supabase/supabase-js'
+import ProfileImage from '@/components/common/ProfileImage'
 
 interface Blog {
   id: string
@@ -75,17 +76,13 @@ export default function MyBlogSidebar({ user }: MyBlogSidebarProps) {
     return (
       <div className="rounded-2xl border border-black/10 p-6 dark:border-white/10">
         <div className="flex items-center gap-3">
-          {profileImage ? (
-            <img
-              src={profileImage}
-              alt={blog.name}
-              className="h-12 w-12 rounded-xl object-cover"
-            />
-          ) : (
-            <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-black text-lg font-bold text-white dark:bg-white dark:text-black">
-              {blog.name.charAt(0)}
-            </div>
-          )}
+          <ProfileImage
+            src={profileImage}
+            alt={blog.name}
+            fallback={blog.name}
+            size="md"
+            rounded="xl"
+          />
           <div>
             <h3 className="font-semibold text-black dark:text-white">
               {blog.name}

@@ -1,5 +1,7 @@
 'use client'
 
+import ProfileImage from '@/components/common/ProfileImage'
+
 interface Blog {
   id: string
   user_id: string
@@ -40,17 +42,13 @@ export default function BlogProfileSidebar({
       <div className="rounded-2xl border border-black/10 p-6 dark:border-white/10">
         {/* 블로그 썸네일 */}
         <div className="flex flex-col items-center">
-          {blog.thumbnail_url || profile?.profile_image_url ? (
-            <img
-              src={blog.thumbnail_url || profile?.profile_image_url || ''}
-              alt={blog.name}
-              className="h-24 w-24 rounded-2xl object-cover"
-            />
-          ) : (
-            <div className="flex h-24 w-24 items-center justify-center rounded-2xl bg-black text-3xl font-bold text-white dark:bg-white dark:text-black">
-              {blog.name.charAt(0)}
-            </div>
-          )}
+          <ProfileImage
+            src={blog.thumbnail_url || profile?.profile_image_url}
+            alt={blog.name}
+            fallback={blog.name}
+            size="lg"
+            rounded="2xl"
+          />
 
           <h1 className="mt-4 text-xl font-bold text-black dark:text-white">
             {blog.name}

@@ -3,6 +3,7 @@
 import { useState, useRef, useEffect } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import type { User } from '@supabase/supabase-js'
+import ProfileImage from '@/components/common/ProfileImage'
 
 interface UserMenuProps {
   user: User
@@ -43,34 +44,27 @@ export default function UserMenu({ user }: UserMenuProps) {
         onClick={() => setIsOpen(!isOpen)}
         className="flex items-center"
       >
-        {profileImage ? (
-          <img
-            src={profileImage}
-            alt={nickname}
-            className="h-9 w-9 rounded-full object-cover"
-          />
-        ) : (
-          <div className="flex h-9 w-9 items-center justify-center rounded-full bg-black text-sm font-medium text-white dark:bg-white dark:text-black">
-            {nickname.charAt(0)}
-          </div>
-        )}
+        <ProfileImage
+          src={profileImage}
+          alt={nickname}
+          fallback={nickname}
+          size="sm"
+          rounded="full"
+        />
       </button>
 
       {isOpen && (
         <div className="absolute right-0 top-full z-50 mt-3 w-max min-w-56 rounded-2xl border border-black/10 bg-white p-5 shadow-xl dark:border-white/10 dark:bg-zinc-900">
           {/* 프로필 정보 */}
           <div className="flex items-center gap-3">
-            {profileImage ? (
-              <img
-                src={profileImage}
-                alt={nickname}
-                className="h-12 w-12 shrink-0 rounded-full object-cover"
-              />
-            ) : (
-              <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-black text-lg font-medium text-white dark:bg-white dark:text-black">
-                {nickname.charAt(0)}
-              </div>
-            )}
+            <ProfileImage
+              src={profileImage}
+              alt={nickname}
+              fallback={nickname}
+              size="md"
+              rounded="full"
+              className="shrink-0"
+            />
             <div>
               <p className="text-base font-semibold text-black dark:text-white">
                 {nickname}

@@ -78,6 +78,7 @@ export default function BlogSettingsPage() {
   const [imageFile, setImageFile] = useState<File | null>(null)
   const [imagePreview, setImagePreview] = useState<string | null>(null)
   const [imageRemoved, setImageRemoved] = useState(false)
+  const [imageLoading, setImageLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [toast, setToast] = useState<{ message: string; type: 'success' | 'error'; visible: boolean }>({
     message: '',
@@ -186,6 +187,7 @@ export default function BlogSettingsPage() {
     setImageFile(file)
     setImagePreview(URL.createObjectURL(file))
     setImageRemoved(false)
+    setImageLoading(true)
   }
 
   const handleImageRemove = () => {
@@ -397,11 +399,20 @@ export default function BlogSettingsPage() {
                       className="group relative h-28 w-28 shrink-0 overflow-hidden rounded-full"
                     >
                       {displayImage ? (
-                        <img
-                          src={displayImage}
-                          alt="Preview"
-                          className="h-full w-full object-cover"
-                        />
+                        <>
+                          {imageLoading && (
+                            <div className="absolute inset-0 flex items-center justify-center bg-black/5 dark:bg-white/5">
+                              <div className="h-6 w-6 animate-spin rounded-full border-2 border-black/20 border-t-black dark:border-white/20 dark:border-t-white" />
+                            </div>
+                          )}
+                          <img
+                            src={displayImage}
+                            alt="Preview"
+                            className={`h-full w-full object-cover transition-opacity ${imageLoading ? 'opacity-0' : 'opacity-100'}`}
+                            onLoad={() => setImageLoading(false)}
+                            onError={() => setImageLoading(false)}
+                          />
+                        </>
                       ) : (
                         <div className="flex h-full w-full items-center justify-center bg-black/5 text-3xl font-bold text-black/30 dark:bg-white/5 dark:text-white/30">
                           {name.charAt(0) || '?'}
