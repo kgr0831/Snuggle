@@ -169,6 +169,82 @@ export async function resetBlogSkin(blogId: string): Promise<void> {
   }
 }
 
+// 사용자가 사용 가능한 스킨 목록 조회 (기본 제공 + 다운로드한 스킨)
+export async function getAvailableSkins(): Promise<BlogSkin[]> {
+  const token = await getAuthToken()
+
+  const headers: HeadersInit = {}
+  if (token) {
+    headers.Authorization = `Bearer ${token}`
+  }
+
+  const response = await fetch(`${API_URL}/api/skins`, { headers })
+
+  if (!response.ok) {
+    throw new Error('Failed to fetch available skins')
+  }
+
+  return response.json()
+}
+
+// 마켓플레이스 스킨 목록 조회 (다운로드 가능한 스킨)
+export async function getMarketplaceSkins(): Promise<BlogSkin[]> {
+  const response = await fetch(`${API_URL}/api/skins/marketplace`)
+
+  if (!response.ok) {
+    throw new Error('Failed to fetch marketplace skins')
+  }
+
+  return response.json()
+}
+
+// 사용자의 스킨 라이브러리 조회 (다운로드한 스킨 ID 목록)
+export interface SkinLibraryItem {
+  skin_id: string
+  downloaded_at: string
+}
+
+export async function getUserSkinLibrary(): Promise<SkinLibraryItem[]> {
+  const token = await getAuthToken()
+
+  if (!token) {
+    return []
+  }
+
+  const response = await fetch(`${API_URL}/api/skins/library`, {
+    headers: {
+      Authorization: `Bearer ${token}`,
+    },
+  })
+
+  if (!response.ok) {
+    throw new Error('Failed to fetch skin library')
+  }
+
+  return response.json()
+}
+
+// 스킨 다운로드 (라이브러리에 추가)
+export async function downloadSkin(skinId: string): Promise<void> {
+  const token = await getAuthToken()
+
+  if (!token) {
+    throw new Error('Not authenticated')
+  }
+
+  const response = await fetch(`${API_URL}/api/skins/download/${skinId}`, {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${token}`,
+    },
+  })
+
+  if (!response.ok) {
+    const error = await response.json()
+    throw new Error(error.error || 'Failed to download skin')
+  }
+}
+
 // 스킨 CSS 변수 병합 (기본 스킨 + 커스텀 오버라이드)
 export function mergeSkinVariables(
   skin: BlogSkin | null,

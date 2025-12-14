@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import { createClient } from '@/lib/supabase/client'
-import { getSystemSkins, applySkin, getBlogSkin, BlogSkin } from '@/lib/api/skins'
+import { getAvailableSkins, applySkin, getBlogSkin, BlogSkin } from '@/lib/api/skins'
 import { getBlogPosts, Post } from '@/lib/api/posts'
 import Toast from '@/components/common/Toast'
 import PreviewBlogLayout from '@/components/skin/PreviewBlogLayout'
@@ -93,8 +93,9 @@ export default function SkinsPage() {
         }
       }
 
+      // 사용 가능한 스킨 조회 (기본 + 다운로드한 스킨)
       try {
-        const skinsData = await getSystemSkins()
+        const skinsData = await getAvailableSkins()
         setSkins(skinsData)
         if (skinsData.length > 0) {
           setSelectedSkin(skinsData[0])
@@ -162,8 +163,14 @@ export default function SkinsPage() {
               홈
             </a>
             <span className="text-sm font-medium text-black dark:text-white">
-              스킨
+              내 스킨
             </span>
+            <a
+              href="/marketplace"
+              className="text-sm text-black/60 hover:text-black dark:text-white/60 dark:hover:text-white"
+            >
+              마켓플레이스
+            </a>
           </nav>
         </div>
       </header>
@@ -174,7 +181,7 @@ export default function SkinsPage() {
         <aside className="w-80 shrink-0 overflow-y-auto border-r border-black/10 bg-white dark:border-white/10 dark:bg-black">
           <div className="sticky top-0 z-10 border-b border-black/5 bg-white/80 px-4 py-3 backdrop-blur dark:border-white/5 dark:bg-black/80">
             <h2 className="text-sm font-semibold text-black dark:text-white">
-              스킨 선택
+              내 스킨
             </h2>
             <p className="mt-0.5 text-xs text-black/50 dark:text-white/50">
               {skins.length}개의 스킨
@@ -257,6 +264,19 @@ export default function SkinsPage() {
                 </button>
               )
             })}
+          </div>
+
+          {/* 마켓플레이스 안내 */}
+          <div className="mx-3 mb-3 rounded-xl bg-zinc-100 p-4 dark:bg-zinc-900">
+            <p className="text-sm text-black/70 dark:text-white/70">
+              더 많은 스킨을 찾고 있나요?
+            </p>
+            <a
+              href="/marketplace"
+              className="mt-2 inline-block text-sm font-medium text-black hover:underline dark:text-white"
+            >
+              마켓플레이스 방문하기 →
+            </a>
           </div>
 
           {/* 로그인/블로그 안내 */}
