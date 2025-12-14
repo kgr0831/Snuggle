@@ -54,6 +54,12 @@ export default function Home() {
               피드
             </a>
             <a
+              href="/forum"
+              className="text-sm font-medium text-black/60 dark:text-white/60"
+            >
+              포럼
+            </a>
+            <a
               href="/skins"
               className="text-sm font-medium text-black/60 dark:text-white/60"
             >
