@@ -8,6 +8,7 @@ import UserMenu from '@/components/auth/UserMenu'
 import PostList from '@/components/blog/PostList'
 import MyBlogSidebar from '@/components/blog/MyBlogSidebar'
 import NewBloggers from '@/components/blog/NewBloggers'
+import SearchInputWithSuggestions from '@/components/search/SearchInputWithSuggestions'
 import { syncProfile } from '@/lib/api/profile'
 import type { User } from '@supabase/supabase-js'
 
@@ -92,11 +93,7 @@ export default function Home() {
 
           {/* Actions */}
           <div className="flex items-center gap-3">
-            <input
-              type="text"
-              placeholder="검색"
-              className="h-9 w-48 rounded-full border border-black/10 bg-transparent px-4 text-sm text-black placeholder-black/40 outline-none dark:border-white/10 dark:text-white dark:placeholder-white/40"
-            />
+            <SearchInputWithSuggestions />
             <ThemeToggle />
             {loading ? (
               <div className="h-9 w-20 animate-pulse rounded-full bg-black/10 dark:bg-white/10" />
