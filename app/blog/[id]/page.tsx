@@ -87,34 +87,39 @@ export default function BlogPage() {
   useEffect(() => {
     const fetchData = async () => {
       const supabase = createClient()
-      const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000'
 
       const { data: { user } } = await supabase.auth.getUser()
       setCurrentUser(user)
 
-      // 백엔드 API에서 블로그 정보 가져오기 (프로필 포함)
-      try {
-        const response = await fetch(`${API_URL}/api/blogs/${blogId}`)
-        if (!response.ok) {
-          setNotFound(true)
-          setLoading(false)
-          return
-        }
+      const { data: blogData, error: blogError } = await supabase
+        .from('blogs')
+        .select('*')
+        .eq('id', blogId)
+        .single()
 
-        const blogData = await response.json()
-        setBlog(blogData)
-        setProfile(blogData.profile)
-      } catch (error) {
-        console.error('Failed to fetch blog:', error)
+      if (blogError || !blogData) {
         setNotFound(true)
         setLoading(false)
         return
+      }
+
+      setBlog(blogData)
+
+      const { data: profileData } = await supabase
+        .from('profiles')
+        .select('id, nickname, profile_image_url')
+        .eq('id', blogData.user_id)
+        .single()
+
+      if (profileData) {
+        setProfile(profileData)
       }
 
       const { count } = await supabase
         .from('posts')
         .select('*', { count: 'exact', head: true })
         .eq('blog_id', blogId)
+        .eq('published', true)
 
       setPostCount(count || 0)
       setLoading(false)

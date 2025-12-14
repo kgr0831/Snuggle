@@ -9,12 +9,9 @@ export const metadata: Metadata = {
 
 const themeScript = `
   (function() {
-    var theme = localStorage.getItem('theme') || 'dark';
-    var d = document.documentElement;
+    const theme = localStorage.getItem('theme') || 'dark';
     if (theme === 'dark') {
-      d.classList.add('dark');
-    } else {
-      d.classList.remove('dark');
+      document.documentElement.classList.add('dark');
     }
   })();
 `;
@@ -25,11 +22,11 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="ko" suppressHydrationWarning className="dark">
+    <html lang="ko" suppressHydrationWarning>
       <head>
         <script dangerouslySetInnerHTML={{ __html: themeScript }} />
       </head>
-      <body className="antialiased bg-white dark:bg-black" suppressHydrationWarning>
+      <body className="antialiased" suppressHydrationWarning>
         <Providers>
           {children}
         </Providers>

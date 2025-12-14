@@ -1,7 +1,7 @@
 'use client'
 
-import { useState, useEffect, useCallback, useRef, Suspense } from 'react'
-import { useRouter, useSearchParams } from 'next/navigation'
+import { useState, useEffect, useCallback, useRef } from 'react'
+import { useRouter } from 'next/navigation'
 import { useEditor, EditorContent, ReactNodeViewRenderer, Editor } from '@tiptap/react'
 import StarterKit from '@tiptap/starter-kit'
 import Image from '@tiptap/extension-image'
@@ -14,7 +14,7 @@ import { createClient } from '@/lib/supabase/client'
 import type { User } from '@supabase/supabase-js'
 import CodeBlockComponent from '@/components/write/CodeBlockComponent'
 import { uploadTempImage, deleteTempImage } from '@/lib/api/upload'
-import { createPost, getPost, updatePost } from '@/lib/api/posts'
+import { createPost } from '@/lib/api/posts'
 import { getCategories, createCategory } from '@/lib/api/categories'
 
 // highlight.js 커스텀 테마 (라이트/다크 모드 지원)
@@ -47,10 +47,8 @@ function extractImageUrls(html: string): string[] {
 // 분리된 컴포넌트들
 import WriteHeader from '@/components/write/WriteHeader'
 import EditorToolbar from '@/components/write/EditorToolbar'
-
 import TitleInput from '@/components/write/TitleInput'
 import CategorySelector from '@/components/write/CategorySelector'
-import PublishDrawer from '@/components/write/PublishDrawer'
 
 // 에디터 전용 스타일
 import '@/components/write/editor.css'
@@ -73,12 +71,8 @@ interface DraftData {
     lastSaved: number
 }
 
-function WriteContent() {
+export default function WritePage() {
     const router = useRouter()
-    const searchParams = useSearchParams()
-    const editPostId = searchParams.get('id')
-    const isEditMode = !!editPostId
-
     const [user, setUser] = useState<User | null>(null)
     const [blog, setBlog] = useState<Blog | null>(null)
     const [title, setTitle] = useState('')
@@ -92,92 +86,23 @@ function WriteContent() {
     const uploadedImagesRef = useRef<Set<string>>(new Set())
     const isInitializedRef = useRef(false)
 
-    // 초기 데이터 로딩 (인증 체크 & 수정 모드일 때 데이터 가져오기)
+    // localStorage에서 초안 불러오기
     useEffect(() => {
-        const init = async () => {
-            const supabase = createClient()
-            const { data: { user } } = await supabase.auth.getUser()
+        if (typeof window === 'undefined') return
 
-            if (!user) {
-                router.push('/')
-                return
+        try {
+            const saved = localStorage.getItem(DRAFT_STORAGE_KEY)
+            if (saved) {
+                const draft: DraftData = JSON.parse(saved)
+                setTitle(draft.title || '')
+                setInitialContent(draft.content || '')
+                setCategoryIds(draft.categoryIds || [])
+                uploadedImagesRef.current = new Set(draft.uploadedImages || [])
             }
-
-            setUser(user)
-
-            // 블로그 정보 가져오기
-            const { data: blogData } = await supabase
-                .from('blogs')
-                .select('id, name')
-                .eq('user_id', user.id)
-                .single()
-
-            if (!blogData) {
-                router.push('/create-blog')
-                return
-            }
-
-            setBlog(blogData)
-
-            // 카테고리 정보 가져오기
-            try {
-                const categoryData = await getCategories(blogData.id)
-                setCategories(categoryData.map(c => ({ id: c.id, name: c.name })))
-            } catch (err) {
-                console.error('Failed to load categories:', err)
-            }
-
-            // 수정 모드: 기존 글 데이터 불러오기
-            if (isEditMode) {
-                try {
-                    const postData = await getPost(editPostId)
-                    if (postData) {
-                        // 본인 글인지 확인
-                        if (postData.user_id !== user.id) {
-                            alert('수정 권한이 없습니다.')
-                            router.back()
-                            return
-                        }
-                        setTitle(postData.title)
-                        setInitialContent(postData.content)
-                        setCategoryIds(postData.category ? [postData.category.id] : [])
-
-                        // 기존 이미지들도 추적 대상에 추가
-                        const existingImages = extractImageUrls(postData.content)
-                        existingImages.forEach(url => uploadedImagesRef.current.add(url))
-                    }
-                } catch (err) {
-                    console.error('Failed to load post for edit:', err)
-                    alert('게시글을 불러오는데 실패했습니다.')
-                    router.back()
-                    return
-                }
-            } else {
-                // 작성 모드: 로컬 스토리지 임시저장 불러오기
-                try {
-                    const saved = localStorage.getItem(DRAFT_STORAGE_KEY)
-                    if (saved) {
-                        const draft: DraftData = JSON.parse(saved)
-                        if (confirm('임시 저장된 글이 있습니다. 불러오시겠습니까?')) {
-                            setTitle(draft.title || '')
-                            setInitialContent(draft.content || '')
-                            setCategoryIds(draft.categoryIds || [])
-                            uploadedImagesRef.current = new Set(draft.uploadedImages || [])
-                        } else {
-                            // 불러오지 않으면 임시저장 삭제
-                            localStorage.removeItem(DRAFT_STORAGE_KEY)
-                        }
-                    }
-                } catch (error) {
-                    console.error('Failed to load draft:', error)
-                }
-            }
-
-            setLoading(false)
+        } catch (error) {
+            console.error('Failed to load draft:', error)
         }
-
-        init()
-    }, [router, isEditMode, editPostId])
+    }, [])
 
     // 에디터에 초기 콘텐츠 설정
     useEffect(() => {
@@ -310,28 +235,24 @@ function WriteContent() {
             },
         },
         onUpdate: ({ editor }) => {
-            // 수정 모드에서는 자동 저장(임시저장)을 하지 않거나, 별도 키로 저장할 수 있음. 
-            // 여기서는 작성 모드일 때만 로컬 스토리지 저장
-            if (!isEditMode) {
-                // 현재 에디터의 이미지 URL 추출
-                const currentContent = editor.getHTML()
-                const currentImages = new Set(extractImageUrls(currentContent))
+            // 현재 에디터의 이미지 URL 추출
+            const currentContent = editor.getHTML()
+            const currentImages = new Set(extractImageUrls(currentContent))
 
-                // 삭제된 이미지 찾기 및 R2에서 삭제
-                uploadedImagesRef.current.forEach(url => {
-                    if (!currentImages.has(url)) {
-                        deleteTempImage(url)
-                        uploadedImagesRef.current.delete(url)
-                    }
-                })
+            // 삭제된 이미지 찾기 및 R2에서 삭제
+            uploadedImagesRef.current.forEach(url => {
+                if (!currentImages.has(url)) {
+                    deleteTempImage(url)
+                    uploadedImagesRef.current.delete(url)
+                }
+            })
 
-                // localStorage에 저장 (디바운스 효과를 위해 setTimeout 사용)
-                saveDraftDebounced(editor.getHTML())
-            }
+            // localStorage에 저장 (디바운스 효과를 위해 setTimeout 사용)
+            saveDraftDebounced(editor.getHTML())
         },
     })
 
-    // 에디터 초기화 Effect (중복 제거됨, 위 useEffect 통합)
+    // 에디터에 초기 콘텐츠 설정 (editor가 생성된 후)
     useEffect(() => {
         if (editor && initialContent && !isInitializedRef.current) {
             editor.commands.setContent(initialContent)
@@ -339,9 +260,9 @@ function WriteContent() {
         }
     }, [editor, initialContent])
 
-    // localStorage에 저장 (작성 모드용)
+    // localStorage에 저장
     const saveDraft = useCallback((content: string) => {
-        if (typeof window === 'undefined' || isEditMode) return
+        if (typeof window === 'undefined') return
 
         const draft: DraftData = {
             title,
@@ -356,7 +277,7 @@ function WriteContent() {
         } catch (error) {
             console.error('Failed to save draft:', error)
         }
-    }, [title, categoryIds, isEditMode])
+    }, [title, categoryIds])
 
     // 디바운스된 저장 함수
     const saveTimeoutRef = useRef<NodeJS.Timeout | null>(null)
@@ -370,12 +291,12 @@ function WriteContent() {
         }, 500)
     }, [saveDraft])
 
-    // 제목/카테고리 변경 시 저장 (작성 모드만)
+    // 제목/카테고리 변경 시 저장
     useEffect(() => {
-        if (editor && isInitializedRef.current && !isEditMode) {
+        if (editor && isInitializedRef.current) {
             saveDraftDebounced(editor.getHTML())
         }
-    }, [title, categoryIds, editor, saveDraftDebounced, isEditMode])
+    }, [title, categoryIds, editor, saveDraftDebounced])
 
     // 초안 삭제
     const clearDraft = useCallback(() => {
@@ -397,27 +318,23 @@ function WriteContent() {
 
             setUser(user)
 
-            // 블로그 정보 가져오기 (다중 블로그 지원)
-            const { data: blogList } = await supabase
+            // 블로그 정보 가져오기
+            const { data: blogData } = await supabase
                 .from('blogs')
                 .select('id, name')
                 .eq('user_id', user.id)
-                .is('deleted_at', null)
-                .order('created_at', { ascending: true })
+                .single()
 
-            if (!blogList || blogList.length === 0) {
+            if (!blogData) {
                 router.push('/create-blog')
                 return
             }
 
-            // 활성 블로그 또는 첫 번째 블로그 사용
-            const savedBlogId = typeof window !== 'undefined' ? localStorage.getItem('activeBlogId') : null
-            const activeBlog = blogList.find(b => b.id === savedBlogId) || blogList[0]
-            setBlog(activeBlog)
+            setBlog(blogData)
 
             // 카테고리 정보 가져오기 (백엔드 API 사용)
             try {
-                const categoryData = await getCategories(activeBlog.id)
+                const categoryData = await getCategories(blogData.id)
                 setCategories(categoryData.map(c => ({ id: c.id, name: c.name })))
             } catch (err) {
                 console.error('Failed to load categories:', err)
@@ -445,88 +362,45 @@ function WriteContent() {
         }
     }
 
-    // 임시저장 (작성 모드 전용)
+    // 임시저장
     const handleSave = () => {
-        if (isEditMode) {
-            alert('수정 모드에서는 임시저장을 지원하지 않습니다.')
-            return
-        }
         if (editor) {
             saveDraft(editor.getHTML())
             alert('임시저장되었습니다.')
         }
     }
 
-    // 발행 서랍 상태
-    const [isDrawerOpen, setIsDrawerOpen] = useState(false)
-
-    // 발행하기 버튼 클릭 -> 서랍 열기
-    const handlePublishClick = () => {
-        if (!title.trim()) {
+    // 발행하기
+    const handlePublish = async () => {
+        if (!editor || !blog || !title.trim()) {
             alert('제목을 입력해주세요.')
             return
         }
 
-        const content = editor?.getHTML()
-        if (!content || content === '<p></p>' || !content.trim()) {
+        const content = editor.getHTML()
+        if (content === '<p></p>' || !content.trim()) {
             alert('내용을 입력해주세요.')
             return
         }
 
-        setIsDrawerOpen(true)
-    }
-
-    // 최종 발행 (서랍에서 확인 클릭 시)
-    const handleConfirmPublish = async (options: {
-        isPrivate: boolean
-        allowComments: boolean
-        thumbnailUrl: string | null
-    }) => {
-        if (!editor || !blog) return
-
-        const content = editor.getHTML()
         setSaving(true)
-        setIsDrawerOpen(false)
 
         try {
-            if (isEditMode && editPostId) {
-                // 수정
-                await updatePost(editPostId, {
-                    title: title.trim(),
-                    content: content,
-                    category_ids: categoryIds,
-                    is_private: options.isPrivate,
-                    is_allow_comment: options.allowComments,
-                    thumbnail_url: options.thumbnailUrl, // 썸네일 수동 지정
-                })
-                alert('게시글이 수정되었습니다.')
-            } else {
-                // 생성
-                await createPost({
-                    blog_id: blog.id,
-                    title: title.trim(),
-                    content: content,
-                    category_ids: categoryIds,
-                    published: true, // published는 true로 고정하되, is_private로 제어
-                    is_private: options.isPrivate,
-                    is_allow_comment: options.allowComments,
-                    thumbnail_url: options.thumbnailUrl,
-                })
+            await createPost({
+                blog_id: blog.id,
+                title: title.trim(),
+                content: content,
+                category_ids: categoryIds,
+                published: true,
+            })
 
-                // 발행 성공 시 초안 삭제
-                clearDraft()
-            }
+            // 발행 성공 시 초안 삭제
+            clearDraft()
 
-            // 블로그 홈 또는 해당 글 상세로 이동
-            if (isEditMode) {
-                router.push(`/post/${editPostId}`)
-            } else {
-                router.push(`/blog/${blog.id}`)
-            }
-
+            router.push(`/blog/${blog.id}`)
         } catch (error) {
-            console.error(isEditMode ? '수정 실패:' : '발행 실패:', error)
-            alert((isEditMode ? '수정' : '발행') + '에 실패했습니다. 다시 시도해주세요.')
+            console.error('발행 실패:', error)
+            alert('발행에 실패했습니다. 다시 시도해주세요.')
         } finally {
             setSaving(false)
         }
@@ -547,9 +421,8 @@ function WriteContent() {
             <WriteHeader
                 onBack={() => router.back()}
                 onSave={handleSave}
-                onPublish={handlePublishClick} // 이전 handlePublish 대신 handlePublishClick 사용
+                onPublish={handlePublish}
                 saving={saving}
-                isEdit={isEditMode} // 헤더에 수정 모드 전달 (버튼 텍스트 변경 등)
             />
 
             {/* 에디터 영역 */}
@@ -577,31 +450,6 @@ function WriteContent() {
                 {/* Tiptap 에디터 */}
                 <EditorContent editor={editor} className="min-h-[500px]" />
             </main>
-
-            {/* 발행 옵션 서랍 */}
-            <PublishDrawer
-                isOpen={isDrawerOpen}
-                onClose={() => setIsDrawerOpen(false)}
-                onConfirm={handleConfirmPublish}
-                // 기존 값 전달 (수정 시 유용하겠지만 현재는 기본값 사용)
-                initialValues={{
-                    isPrivate: false, // 기본값
-                    allowComments: true, // 기본값
-                    thumbnailUrl: null, // 에디터 내용 기반 자동 추출 or 기존 썸네일
-                }}
-            />
         </div>
-    )
-}
-
-export default function WritePage() {
-    return (
-        <Suspense fallback={
-            <div className="flex min-h-screen items-center justify-center bg-white dark:bg-black">
-                <div className="h-8 w-8 animate-spin rounded-full border-2 border-black/20 border-t-black dark:border-white/20 dark:border-t-white" />
-            </div>
-        }>
-            <WriteContent />
-        </Suspense>
     )
 }

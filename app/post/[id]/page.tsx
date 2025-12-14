@@ -5,10 +5,6 @@ import { useParams, useRouter } from 'next/navigation'
 import { getPost, PostWithDetails } from '@/lib/api/posts'
 import hljs from 'highlight.js'
 import BlogSkinProvider from '@/components/blog/BlogSkinProvider'
-import AccessDenied from '@/components/common/AccessDenied'
-import PostActionMenu from '@/components/post/PostActionMenu'
-import { useUserStore } from '@/lib/store/useUserStore'
-import { deletePost, updatePost } from '@/lib/api/posts'
 
 // 게시글 컨텐츠 스타일
 import '@/styles/post-content.css'
@@ -23,7 +19,6 @@ export default function PostPage() {
     const [postData, setPostData] = useState<PostWithDetails | null>(null)
     const [loading, setLoading] = useState(true)
     const [notFound, setNotFound] = useState(false)
-    const { user } = useUserStore() // 유저 스토어 사용 (최상위 호출)
 
     useEffect(() => {
         const fetchData = async () => {
@@ -71,77 +66,27 @@ export default function PostPage() {
 
     if (loading) {
         return (
-            <div
-                className="flex min-h-screen items-center justify-center"
-                style={{ background: 'var(--background)' }}
-            >
-                <div
-                    className="h-8 w-8 animate-spin rounded-full border-2"
-                    style={{
-                        borderColor: 'color-mix(in srgb, var(--foreground) 20%, transparent)',
-                        borderTopColor: 'var(--foreground)'
-                    }}
-                />
+            <div className="flex min-h-screen items-center justify-center bg-white dark:bg-black">
+                <div className="h-8 w-8 animate-spin rounded-full border-2 border-black/20 border-t-black dark:border-white/20 dark:border-t-white" />
             </div>
         )
     }
 
     if (notFound || !postData || !postData.blog) {
         return (
-            <div
-                className="flex min-h-screen flex-col items-center justify-center"
-                style={{ background: 'var(--background)', color: 'var(--foreground)' }}
-            >
-                <h1 className="text-2xl font-bold">
+            <div className="flex min-h-screen flex-col items-center justify-center bg-white dark:bg-black">
+                <h1 className="text-2xl font-bold text-black dark:text-white">
                     게시글을 찾을 수 없습니다
                 </h1>
                 <button
                     onClick={() => router.back()}
-                    className="mt-4 opacity-50 hover:opacity-100"
+                    className="mt-4 text-black/50 hover:text-black dark:text-white/50 dark:hover:text-white"
                 >
                     뒤로 가기
                 </button>
             </div>
         )
     }
-
-
-
-    const handleEdit = () => {
-        // 수정 페이지로 이동
-        router.push(`/write?id=${postId}`)
-    }
-
-    const handleDelete = async () => {
-        try {
-            await deletePost(postId)
-            alert('게시글이 삭제되었습니다.')
-            router.push(`/blog/${postData?.blog.id}`)
-        } catch (error) {
-            console.error('Delete failed:', error)
-            alert('삭제에 실패했습니다.')
-        }
-    }
-
-    const handleToggleVisibility = async () => {
-        if (!postData) return
-        const newPrivateState = !((postData as any).is_private)
-
-        try {
-            await updatePost(postId, {
-                is_private: newPrivateState
-            })
-            // 상태 업데이트 (UI 반영)
-            setPostData({ ...postData, is_private: newPrivateState } as any)
-            alert(newPrivateState ? '비공개로 전환되었습니다.' : '공개로 전환되었습니다.')
-        } catch (error) {
-            console.error('Toggle visibility failed:', error)
-            alert('상태 변경에 실패했습니다.')
-        }
-    }
-
-    // 작성자 확인
-    const isAuthor = user?.id === postData?.user_id
 
     return (
         <BlogSkinProvider blogId={postData.blog.id}>
@@ -157,8 +102,8 @@ export default function PostPage() {
 
                 {/* 메인 컨텐츠 */}
                 <main className="mx-auto max-w-3xl px-6 py-12">
-                    {/* 비공개 표시 - is_private 체크 */}
-                    {((postData as any).is_private) && (
+                    {/* 비공개 표시 */}
+                    {!postData.published && (
                         <div className="mb-6 flex items-center gap-2 rounded-lg bg-yellow-50 px-4 py-3 text-yellow-800 dark:bg-yellow-900/20 dark:text-yellow-500">
                             <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m0 0v2m0-2h2m-2 0H9m3-4V8a3 3 0 00-3-3H6a3 3 0 00-3 3v1m12-1a3 3 0 013 3v6a3 3 0 01-3 3H6a3 3 0 01-3-3v-6" />
@@ -180,43 +125,32 @@ export default function PostPage() {
                     </h1>
 
                     {/* 메타 정보 */}
-                    <div className="mt-6 flex items-center justify-between border-b border-[var(--blog-border)] pb-6">
-                        <div className="flex items-center gap-4">
-                            {/* 작성자 */}
-                            <a
-                                href={`/blog/${postData.blog.id}`}
-                                className="flex items-center gap-3 transition-opacity hover:opacity-80"
-                            >
-                                {(postData.blog.thumbnail_url || postData.profile?.profile_image_url) ? (
-                                    <img
-                                        src={postData.blog.thumbnail_url || postData.profile?.profile_image_url || ''}
-                                        alt={postData.profile?.nickname || postData.blog.name}
-                                        className="h-10 w-10 rounded-full object-cover"
-                                    />
-                                ) : (
-                                    <div className="flex h-10 w-10 items-center justify-center rounded-full bg-[var(--blog-fg)]/10 text-sm font-bold text-[var(--blog-muted)]">
-                                        {(postData.profile?.nickname || postData.blog.name).charAt(0)}
-                                    </div>
-                                )}
-                                <div>
-                                    <p className="font-medium text-[var(--blog-fg)]">
-                                        {postData.profile?.nickname || postData.blog.name}
-                                    </p>
-                                    <p className="text-sm text-[var(--blog-muted)]">
-                                        {formatDate(postData.created_at)}
-                                    </p>
+                    <div className="mt-6 flex items-center gap-4 border-b border-[var(--blog-border)] pb-6">
+                        {/* 작성자 */}
+                        <a
+                            href={`/blog/${postData.blog.id}`}
+                            className="flex items-center gap-3 transition-opacity hover:opacity-80"
+                        >
+                            {(postData.blog.thumbnail_url || postData.profile?.profile_image_url) ? (
+                                <img
+                                    src={postData.blog.thumbnail_url || postData.profile?.profile_image_url || ''}
+                                    alt={postData.profile?.nickname || postData.blog.name}
+                                    className="h-10 w-10 rounded-full object-cover"
+                                />
+                            ) : (
+                                <div className="flex h-10 w-10 items-center justify-center rounded-full bg-[var(--blog-fg)]/10 text-sm font-bold text-[var(--blog-muted)]">
+                                    {(postData.profile?.nickname || postData.blog.name).charAt(0)}
                                 </div>
-                            </a>
-                        </div>
-
-                        {/* 메뉴 버튼 */}
-                        <PostActionMenu
-                            isAuthor={isAuthor}
-                            isPrivate={(postData as any).is_private}
-                            onEdit={handleEdit}
-                            onDelete={handleDelete}
-                            onToggleVisibility={handleToggleVisibility}
-                        />
+                            )}
+                            <div>
+                                <p className="font-medium text-[var(--blog-fg)]">
+                                    {postData.profile?.nickname || postData.blog.name}
+                                </p>
+                                <p className="text-sm text-[var(--blog-muted)]">
+                                    {formatDate(postData.created_at)}
+                                </p>
+                            </div>
+                        </a>
                     </div>
 
                     {/* 본문 */}
