@@ -66,21 +66,33 @@ export default function PostPage() {
 
     if (loading) {
         return (
-            <div className="flex min-h-screen items-center justify-center bg-white dark:bg-black">
-                <div className="h-8 w-8 animate-spin rounded-full border-2 border-black/20 border-t-black dark:border-white/20 dark:border-t-white" />
+            <div
+                className="flex min-h-screen items-center justify-center"
+                style={{ background: 'var(--background)' }}
+            >
+                <div
+                    className="h-8 w-8 animate-spin rounded-full border-2"
+                    style={{
+                        borderColor: 'color-mix(in srgb, var(--foreground) 20%, transparent)',
+                        borderTopColor: 'var(--foreground)'
+                    }}
+                />
             </div>
         )
     }
 
     if (notFound || !postData || !postData.blog) {
         return (
-            <div className="flex min-h-screen flex-col items-center justify-center bg-white dark:bg-black">
-                <h1 className="text-2xl font-bold text-black dark:text-white">
+            <div
+                className="flex min-h-screen flex-col items-center justify-center"
+                style={{ background: 'var(--background)', color: 'var(--foreground)' }}
+            >
+                <h1 className="text-2xl font-bold">
                     게시글을 찾을 수 없습니다
                 </h1>
                 <button
                     onClick={() => router.back()}
-                    className="mt-4 text-black/50 hover:text-black dark:text-white/50 dark:hover:text-white"
+                    className="mt-4 opacity-50 hover:opacity-100"
                 >
                     뒤로 가기
                 </button>
