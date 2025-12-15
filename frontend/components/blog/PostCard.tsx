@@ -49,11 +49,11 @@ export default function PostCard({ post }: PostCardProps) {
 
   return (
     <a href={`/post/${post.id}`} className="block">
-      <article className="border-b border-black/10 py-6 transition-colors hover:bg-black/[0.02] dark:border-white/10 dark:hover:bg-white/[0.02]">
-        <div className="flex gap-4">
+      <article className="h-40 border-b border-black/10 py-6 transition-colors hover:bg-black/[0.02] dark:border-white/10 dark:hover:bg-white/[0.02]">
+        <div className="flex h-full gap-4">
           {/* 썸네일 */}
           {post.thumbnail_url && (
-            <div className="h-24 w-24 flex-shrink-0 overflow-hidden rounded-lg">
+            <div className="h-24 w-24 flex-shrink-0 overflow-hidden rounded-lg bg-gray-100 dark:bg-gray-800">
               <img
                 src={post.thumbnail_url}
                 alt={post.title}
@@ -63,18 +63,20 @@ export default function PostCard({ post }: PostCardProps) {
           )}
 
           {/* 콘텐츠 */}
-          <div className="flex-1 min-w-0">
-            <h3 className="text-lg font-semibold text-black dark:text-white truncate">
-              {post.title}
-            </h3>
-            {preview && (
-              <p className="mt-1 text-sm text-black/60 dark:text-white/60 line-clamp-1">
-                {preview}
-              </p>
-            )}
+          <div className="flex-1 min-w-0 flex flex-col justify-between">
+            <div>
+              <h3 className="text-lg font-semibold text-black dark:text-white truncate">
+                {post.title}
+              </h3>
+              {preview && (
+                <p className="mt-1 text-sm text-black/60 dark:text-white/60 line-clamp-2">
+                  {preview}
+                </p>
+              )}
+            </div>
 
             {/* 블로그 정보 */}
-            <div className="mt-3 flex items-center gap-2">
+            <div className="flex items-center gap-2">
               {blogImage && (
                 <img
                   src={blogImage}

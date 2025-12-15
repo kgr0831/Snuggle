@@ -19,11 +19,13 @@ interface Post {
 export default function PostList() {
   const [posts, setPosts] = useState<Post[]>([])
   const [loading, setLoading] = useState(true)
+  const [currentPage, setCurrentPage] = useState(1)
+  const POSTS_PER_PAGE = 5
 
   useEffect(() => {
     const fetchPosts = async () => {
       try {
-        const data = await getPosts(20, 0)
+        const data = await getPosts(15, 0) // Fetch 15 posts
         setPosts(data)
       } catch (err) {
         console.error('Error fetching posts:', err)
@@ -63,11 +65,35 @@ export default function PostList() {
     )
   }
 
+  // Calculate posts for current page
+  const startIndex = (currentPage - 1) * POSTS_PER_PAGE
+  const currentPosts = posts.slice(startIndex, startIndex + POSTS_PER_PAGE)
+  const totalPages = Math.ceil(posts.length / POSTS_PER_PAGE)
+
   return (
     <div>
-      {posts.map((post) => (
-        <PostCard key={post.id} post={post} />
-      ))}
+      <div className="h-[800px]">
+        {currentPosts.map((post) => (
+          <PostCard key={post.id} post={post} />
+        ))}
+      </div>
+
+      {totalPages > 1 && (
+        <div className="mt-8 flex justify-center gap-2">
+          {Array.from({ length: totalPages }, (_, i) => i + 1).map((page) => (
+            <button
+              key={page}
+              onClick={() => setCurrentPage(page)}
+              className={`h-8 w-8 rounded-full text-sm font-medium transition-colors ${currentPage === page
+                ? 'bg-black text-white dark:bg-white dark:text-black'
+                : 'bg-gray-100 text-gray-600 hover:bg-gray-200 dark:bg-gray-800 dark:text-gray-400 dark:hover:bg-gray-700'
+                }`}
+            >
+              {page}
+            </button>
+          ))}
+        </div>
+      )}
     </div>
   )
 }
