@@ -259,8 +259,16 @@ export async function getFeedPosts(limit = 14): Promise<PostListItem[]> {
   if (!response.ok) {
     throw new Error('Failed to fetch feed')
   }
-
   return response.json()
 }
 
+// 오늘의 인기글
+export async function getPopularPosts(): Promise<PostListItem[]> {
+  const response = await fetch(`${API_URL}/api/posts/popular`)
 
+  if (!response.ok) {
+    throw new Error('Failed to fetch popular posts')
+  }
+
+  return response.json()
+}

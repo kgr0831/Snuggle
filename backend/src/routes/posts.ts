@@ -94,6 +94,68 @@ router.get('/feed', authMiddleware, async (req: AuthenticatedRequest, res: Respo
   }
 })
 
+// 오늘의 인기글 (최근 7일 기준 좋아요 순)
+router.get('/popular', async (req: Request, res: Response): Promise<void> => {
+  try {
+    // 오늘의 인기글 -> 오늘 00:00:00 이후 작성된 글만
+    const today = new Date()
+    today.setHours(0, 0, 0, 0)
+
+    const { data: posts, error } = await supabase
+      .from('posts')
+      .select(`
+        id, title, content, thumbnail_url, created_at, blog_id, user_id, like_count,
+        blog:blogs ( name, thumbnail_url, user_id )
+      `)
+      .gt('created_at', today.toISOString()) // 오늘 작성된 글만
+      .gt('like_count', 0) // 좋아요 1개 이상만
+      .eq('published', true)
+      .eq('is_private', false)
+      .order('like_count', { ascending: false })
+      .limit(5)
+
+    if (error) {
+      throw error
+    }
+
+    // 프로필 정보 가져오기 (작성자 프로필)
+    const userIds = (posts || []).map((p: any) => p.blog?.user_id).filter(Boolean)
+
+    const { data: profiles } = await supabase
+      .from('profiles')
+      .select('id, nickname, profile_image_url')
+      .in('id', userIds)
+
+    const profileMap = new Map(
+      (profiles || []).map((p: any) => [p.id, p])
+    )
+
+    const result = (posts || []).map((post: any) => {
+      const blogUserId = post.blog?.user_id
+      const profile = blogUserId ? profileMap.get(blogUserId) : null
+
+      return {
+        id: post.id,
+        title: post.title,
+        content: post.content,
+        thumbnail_url: post.thumbnail_url,
+        created_at: post.created_at,
+        like_count: post.like_count || 0,
+        blog: post.blog ? {
+          name: post.blog.name,
+          thumbnail_url: post.blog.thumbnail_url,
+          profile_image_url: profile ? profile.profile_image_url : null
+        } : null
+      }
+    })
+
+    res.json(result)
+  } catch (error) {
+    logger.error('Popular posts error:', error)
+    res.status(500).json({ error: 'Failed to fetch popular posts' })
+  }
+})
+
 // 전체 게시글 목록 (공개글만, 인증 불필요) - N+1 해결
 router.get('/', async (req: Request, res: Response): Promise<void> => {
   try {
