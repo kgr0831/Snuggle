@@ -30,8 +30,13 @@ export interface Comment {
     } | null
 }
 
+export interface CommentsResponse {
+    comments: Comment[]
+    totalCount: number
+}
+
 // 댓글 목록 조회 (루트 댓글 기준 페이지네이션)
-export async function getComments(postId: string, limit = 20, offset = 0): Promise<Comment[]> {
+export async function getComments(postId: string, limit = 20, offset = 0): Promise<CommentsResponse> {
     const token = await getAuthToken()
     const headers: Record<string, string> = {}
 

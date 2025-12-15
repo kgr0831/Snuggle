@@ -15,6 +15,18 @@ router.get('/:postId', async (req: AuthenticatedRequest, res: Response): Promise
         // 토큰이 있으면 인증된 클라이언트, 없으면 익명 클라이언트 사용
         const client = token ? createAuthenticatedClient(token) : supabase
 
+        // 0. 전체 댓글 수 조회
+        const { count: totalCount, error: countError } = await client
+            .from('post_comment')
+            .select('*', { count: 'exact', head: true })
+            .eq('post_id', postId)
+
+        if (countError) {
+            console.error('Fetch comment count error:', countError)
+            res.status(500).json({ error: 'Failed to fetch comments' })
+            return
+        }
+
         // 1. 루트 댓글만 페이지네이션해서 가져오기
         const { data: rootComments, error: rootError } = await client
             .from('post_comment')
@@ -43,7 +55,7 @@ router.get('/:postId', async (req: AuthenticatedRequest, res: Response): Promise
         }
 
         if (!rootComments || rootComments.length === 0) {
-            res.json([])
+            res.json({ comments: [], totalCount: totalCount || 0 })
             return
         }
 
@@ -74,9 +86,9 @@ router.get('/:postId', async (req: AuthenticatedRequest, res: Response): Promise
             return
         }
 
-        // 루트 댓글 + 대댓글 합쳐서 반환
+        // 루트 댓글 + 대댓글 합쳐서 반환 (totalCount 포함)
         const allComments = [...rootComments, ...(replies || [])]
-        res.json(allComments)
+        res.json({ comments: allComments, totalCount: totalCount || 0 })
     } catch (error) {
         console.error('Fetch comments error:', error)
         res.status(500).json({ error: 'Failed to fetch comments' })

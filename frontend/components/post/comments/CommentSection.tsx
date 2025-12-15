@@ -19,6 +19,7 @@ export default function CommentSection({ postId }: CommentSectionProps) {
     const { selectedBlog, isLoading: isBlogLoading, hasFetched, fetchBlogs } = useBlogStore()
     const { showAlert } = useModal()
     const [comments, setComments] = useState<Comment[]>([])
+    const [totalCount, setTotalCount] = useState(0)
     const [loading, setLoading] = useState(true)
     const [loadingMore, setLoadingMore] = useState(false)
     const [hasMore, setHasMore] = useState(true)
@@ -37,8 +38,9 @@ export default function CommentSection({ postId }: CommentSectionProps) {
     // 초기 댓글 로드
     const fetchComments = useCallback(async () => {
         try {
-            const data = await getComments(postId, COMMENTS_PER_PAGE, 0)
+            const { comments: data, totalCount: total } = await getComments(postId, COMMENTS_PER_PAGE, 0)
             setComments(data)
+            setTotalCount(total)
             // 루트 댓글 수 계산
             const rootCount = data.filter(c => !c.parent_id).length
             setRootOffset(rootCount)
@@ -60,7 +62,7 @@ export default function CommentSection({ postId }: CommentSectionProps) {
 
         setLoadingMore(true)
         try {
-            const newComments = await getComments(postId, COMMENTS_PER_PAGE, rootOffset)
+            const { comments: newComments } = await getComments(postId, COMMENTS_PER_PAGE, rootOffset)
             if (newComments.length > 0) {
                 setComments(prev => [...prev, ...newComments])
                 const newRootCount = newComments.filter(c => !c.parent_id).length
@@ -106,6 +108,7 @@ export default function CommentSection({ postId }: CommentSectionProps) {
         try {
             const newComment = await createComment(postId, text, undefined, selectedBlog?.id)
             setComments(prev => [...prev, newComment])
+            setTotalCount(prev => prev + 1)
         } catch (err) {
             console.error(err)
             await showAlert('댓글 작성에 실패했습니다.')
@@ -118,6 +121,7 @@ export default function CommentSection({ postId }: CommentSectionProps) {
         try {
             const newComment = await createComment(postId, text, parentId, selectedBlog?.id)
             setComments(prev => [...prev, newComment])
+            setTotalCount(prev => prev + 1)
         } catch (err) {
             throw err // Let Item handle error alert
         }
@@ -126,6 +130,11 @@ export default function CommentSection({ postId }: CommentSectionProps) {
     const handleDelete = async (commentId: string) => {
         try {
             await deleteComment(commentId)
+            // 삭제된 댓글과 그 대댓글 수 계산
+            const deletedComment = comments.find(c => c.id === commentId)
+            const deletedReplies = comments.filter(c => c.parent_id === commentId)
+            const deletedCount = 1 + deletedReplies.length
+            setTotalCount(prev => prev - deletedCount)
             await fetchComments() // Refresh list
         } catch (err) {
             throw err
@@ -138,7 +147,7 @@ export default function CommentSection({ postId }: CommentSectionProps) {
     return (
         <div className="mt-16 border-t border-[var(--blog-border)] pt-8">
             <h3 className="mb-6 text-lg font-bold text-[var(--blog-fg)]">
-                댓글 <span className="text-[var(--blog-muted)]">{comments.length}</span>
+                댓글 <span className="text-[var(--blog-muted)]">{totalCount}</span>
             </h3>
 
             {/* 댓글 작성 폼 */}
