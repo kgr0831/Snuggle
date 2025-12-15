@@ -94,7 +94,7 @@ export async function getBlogPosts(blogId: string, showAll = false): Promise<Pos
 }
 
 // 게시글 상세 조회
-export async function getPost(id: string): Promise<PostWithDetails | null> {
+export async function getPost(id: string, selectedBlogId?: string): Promise<PostWithDetails | null> {
   const token = await getAuthToken()
   const headers: Record<string, string> = {}
 
@@ -102,7 +102,11 @@ export async function getPost(id: string): Promise<PostWithDetails | null> {
     headers.Authorization = `Bearer ${token}`
   }
 
-  const response = await fetch(`${API_URL}/api/posts/${id}`, { headers })
+  const url = selectedBlogId
+    ? `${API_URL}/api/posts/${id}?selectedBlogId=${selectedBlogId}`
+    : `${API_URL}/api/posts/${id}`
+
+  const response = await fetch(url, { headers })
   if (response.status === 403) {
     throw new Error('Private')
   }

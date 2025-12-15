@@ -10,6 +10,7 @@ import BlogHeader from '@/components/layout/BlogHeader'
 import AccessDenied from '@/components/common/AccessDenied'
 import PostActionMenu from '@/components/post/PostActionMenu'
 import { useUserStore } from '@/lib/store/useUserStore'
+import { useBlogStore } from '@/lib/store/useBlogStore'
 import { deletePost, updatePost } from '@/lib/api/posts'
 import { useModal } from '@/components/common/Modal'
 import SubscriptionCard from '@/components/post/SubscriptionCard'
@@ -30,6 +31,7 @@ export default function PostPage() {
     const [notFound, setNotFound] = useState(false)
     const [isPrivateError, setIsPrivateError] = useState(false)
     const { user } = useUserStore()
+    const { selectedBlog } = useBlogStore()
     const { showAlert } = useModal()
 
     // 페이지 진입/변경 시 스크롤 최상단 이동
@@ -39,9 +41,15 @@ export default function PostPage() {
 
     useEffect(() => {
         const fetchData = async () => {
+            // 에러 상태 초기화
+            setIsPrivateError(false)
+            setNotFound(false)
+            setLoading(true)
+
             // 게시글 정보 (백엔드 API 사용)
+            // selectedBlog?.id를 전달하여 비공개 글 접근 권한 확인
             try {
-                const data = await getPost(postId)
+                const data = await getPost(postId, selectedBlog?.id)
                 if (!data) {
                     setNotFound(true)
                     setLoading(false)
@@ -60,7 +68,7 @@ export default function PostPage() {
         }
 
         fetchData()
-    }, [postId])
+    }, [postId, selectedBlog?.id])
 
     // 코드블록 하이라이팅 적용
     useEffect(() => {
@@ -155,8 +163,8 @@ export default function PostPage() {
         }
     }
 
-    // 작성자 확인
-    const isAuthor = user?.id === postData?.user_id
+    // 작성자 확인 - user_id 일치 + 현재 선택된 블로그가 해당 게시글의 블로그인지 확인
+    const isAuthor = user?.id === postData?.user_id && selectedBlog?.id === postData?.blog?.id
 
     return (
         <BlogSkinProvider blogId={postData.blog.id}>
