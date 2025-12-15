@@ -284,12 +284,9 @@ router.get('/:id', async (req: Request, res: Response): Promise<void> => {
     const { data: post, error: postError } = await supabase
       .from('posts')
       .select(`
-    *,
-    blog: blogs(id, user_id, name, thumbnail_url),
-      category: categories(id, name)
-        `)
         *,
-        blog:blogs ( id, user_id, name, thumbnail_url, description )
+        blog:blogs ( id, user_id, name, thumbnail_url, description ),
+        category:categories ( id, name )
       `)
       .eq('id', id)
       .single()
