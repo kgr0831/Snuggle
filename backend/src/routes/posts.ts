@@ -22,6 +22,7 @@ router.get('/feed', authMiddleware, async (req: AuthenticatedRequest, res: Respo
   try {
     const user = req.user!
     const limit = parseInt(req.query.limit as string) || 14
+    const offset = parseInt(req.query.offset as string) || 0
 
     // 1. 내가 구독한 사람들의 ID (subed_id) 가져오기
     const { data: subscribed, error: subError } = await supabase
@@ -47,7 +48,7 @@ router.get('/feed', authMiddleware, async (req: AuthenticatedRequest, res: Respo
       `)
       .in('user_id', subscribedUserIds)
       .order('created_at', { ascending: false })
-      .limit(limit)
+      .range(offset, offset + limit - 1)
 
     if (postError) throw postError
 
@@ -212,6 +213,7 @@ router.get('/:id', async (req: Request, res: Response): Promise<void> => {
   try {
     const { id } = req.params
     const authHeader = req.headers.authorization
+    const selectedBlogId = req.query.selectedBlogId as string | undefined
 
     // relation join으로 단일 쿼리로 조회
     const { data: post, error: postError } = await supabase
@@ -240,17 +242,22 @@ router.get('/:id', async (req: Request, res: Response): Promise<void> => {
     }
 
     // 비공개 글 접근 권한 확인
+    // user_id가 일치하고, 현재 선택된 블로그가 해당 게시글의 블로그인 경우에만 접근 가능
     if (typedPost.is_private) {
-      let isOwner = false
+      let canAccess = false
 
       if (authHeader?.startsWith('Bearer ')) {
         const token = authHeader.split(' ')[1]
         const authClient = createAuthenticatedClient(token)
         const { data: { user } } = await authClient.auth.getUser()
-        isOwner = user?.id === typedPost.user_id
+
+        // 작성자이면서 현재 선택된 블로그가 게시글의 블로그와 일치해야 함
+        const isOwner = user?.id === typedPost.user_id
+        const isSameBlog = selectedBlogId === typedPost.blog.id
+        canAccess = isOwner && isSameBlog
       }
 
-      if (!isOwner) {
+      if (!canAccess) {
         res.status(403).json({ error: 'Private post' })
         return
       }
