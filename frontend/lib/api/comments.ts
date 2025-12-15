@@ -14,6 +14,7 @@ export interface Comment {
     id: string
     post_id: string
     user_id: string
+    blog_id: string | null
     comment_text: string
     created_at: string
     parent_id: string | null
@@ -22,6 +23,11 @@ export interface Comment {
         nickname: string | null
         profile_image_url: string | null
     }
+    blog: {
+        id: string
+        name: string
+        thumbnail_url: string | null
+    } | null
 }
 
 // 댓글 목록 조회
@@ -46,7 +52,7 @@ export async function getComments(postId: string): Promise<Comment[]> {
 }
 
 // 댓글 작성
-export async function createComment(postId: string, text: string, parentId?: string): Promise<Comment> {
+export async function createComment(postId: string, text: string, parentId?: string, blogId?: string): Promise<Comment> {
     const token = await getAuthToken()
 
     if (!token) {
@@ -62,7 +68,8 @@ export async function createComment(postId: string, text: string, parentId?: str
         body: JSON.stringify({
             post_id: postId,
             comment_text: text,
-            parent_id: parentId
+            parent_id: parentId,
+            blog_id: blogId
         }),
     })
 

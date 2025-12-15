@@ -9,7 +9,7 @@ import { useModal } from '@/components/common/Modal'
 interface CommentItemProps {
     comment: Comment
     replies: Comment[]
-    allComments: Comment[] // 모든 댓글 (대대댓글 처리를 위해 필요할 수 있음)
+    allComments: Comment[]
     onReply: (parentId: string, text: string) => Promise<void>
     onDelete: (commentId: string) => Promise<void>
 }
@@ -28,6 +28,10 @@ export default function CommentItem({
     const [isSubmitting, setIsSubmitting] = useState(false)
 
     const isAuthor = user?.id === comment.user_id
+
+    // 댓글에 저장된 블로그 정보 사용, 없으면 프로필 정보로 폴백
+    const displayName = comment.blog?.name || comment.profiles?.nickname || '알 수 없음'
+    const displayImage = comment.blog?.thumbnail_url || comment.profiles?.profile_image_url
 
     const formatDate = (dateString: string) => {
         const date = new Date(dateString)
@@ -82,15 +86,15 @@ export default function CommentItem({
             <div className="flex gap-3">
                 {/* 프로필 이미지 */}
                 <div className="shrink-0">
-                    {comment.profiles?.profile_image_url ? (
+                    {displayImage ? (
                         <img
-                            src={comment.profiles.profile_image_url}
-                            alt={comment.profiles.nickname || 'User'}
+                            src={displayImage}
+                            alt={displayName}
                             className="h-9 w-9 rounded-full object-cover border border-[var(--blog-border)]"
                         />
                     ) : (
                         <div className="flex h-9 w-9 items-center justify-center rounded-full bg-[var(--blog-fg)]/10 text-sm font-bold text-[var(--blog-muted)]">
-                            {(comment.profiles?.nickname || 'U').charAt(0)}
+                            {(displayName || 'U').charAt(0)}
                         </div>
                     )}
                 </div>
@@ -99,7 +103,7 @@ export default function CommentItem({
                     {/* 헤더 */}
                     <div className="flex items-center gap-2">
                         <span className="font-bold text-[var(--blog-fg)]">
-                            {comment.profiles?.nickname || '알 수 없음'}
+                            {displayName}
                         </span>
                         <span className="text-xs text-[var(--blog-muted)]">
                             {formatDate(comment.created_at)}
@@ -139,7 +143,7 @@ export default function CommentItem({
                             <CommentForm
                                 onSubmit={handleReplySubmit}
                                 onCancel={() => setIsReplying(false)}
-                                placeholder={`@${comment.profiles?.nickname} 님에게 답글 달기`}
+                                placeholder={`@${displayName} 님에게 답글 달기`}
                                 buttonLabel="답글 등록"
                                 loading={isSubmitting}
                                 autoFocus

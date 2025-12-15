@@ -15,6 +15,7 @@ interface BlogStore {
     blogs: Blog[]
     selectedBlog: Blog | null
     isLoading: boolean
+    hasFetched: boolean
     setBlogs: (blogs: Blog[]) => void
     setSelectedBlog: (blog: Blog | null) => void
     selectBlog: (blog: Blog) => void
@@ -26,7 +27,8 @@ interface BlogStore {
 export const useBlogStore = create<BlogStore>((set, get) => ({
     blogs: [],
     selectedBlog: null,
-    isLoading: true,
+    isLoading: false,
+    hasFetched: false,
 
     setBlogs: (blogs) => set({ blogs }),
 
@@ -56,12 +58,12 @@ export const useBlogStore = create<BlogStore>((set, get) => ({
 
             if (error) {
                 console.error('Failed to fetch blogs:', error)
-                set({ blogs: [], selectedBlog: null, isLoading: false })
+                set({ blogs: [], selectedBlog: null, isLoading: false, hasFetched: true })
                 return
             }
 
             if (!data || data.length === 0) {
-                set({ blogs: [], selectedBlog: null, isLoading: false })
+                set({ blogs: [], selectedBlog: null, isLoading: false, hasFetched: true })
                 return
             }
 
@@ -76,16 +78,16 @@ export const useBlogStore = create<BlogStore>((set, get) => ({
             const savedBlog = data.find(b => b.id === savedBlogId)
             const selectedBlog = savedBlog || data[0]
 
-            set({ selectedBlog, isLoading: false })
+            set({ selectedBlog, isLoading: false, hasFetched: true })
 
         } catch (err) {
             console.error('Failed to fetch blogs:', err)
-            set({ blogs: [], selectedBlog: null, isLoading: false })
+            set({ blogs: [], selectedBlog: null, isLoading: false, hasFetched: true })
         }
     },
 
     clear: () => {
-        set({ blogs: [], selectedBlog: null, isLoading: false })
+        set({ blogs: [], selectedBlog: null, isLoading: false, hasFetched: false })
         if (typeof window !== 'undefined') {
             localStorage.removeItem(SELECTED_BLOG_KEY)
         }

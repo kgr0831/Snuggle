@@ -13,7 +13,7 @@ router.get('/:postId', async (req: AuthenticatedRequest, res: Response): Promise
         // 토큰이 있으면 인증된 클라이언트, 없으면 익명 클라이언트 사용
         const client = token ? createAuthenticatedClient(token) : supabase
 
-        // 모든 댓글 가져오기 (작성자 정보 포함)
+        // 모든 댓글 가져오기 (작성자 정보 + 블로그 정보 포함)
         const { data: comments, error } = await client
             .from('post_comment')
             .select(`
@@ -22,6 +22,11 @@ router.get('/:postId', async (req: AuthenticatedRequest, res: Response): Promise
                     id,
                     nickname,
                     profile_image_url
+                ),
+                blog:blog_id (
+                    id,
+                    name,
+                    thumbnail_url
                 )
             `)
             .eq('post_id', postId)
@@ -44,7 +49,7 @@ router.get('/:postId', async (req: AuthenticatedRequest, res: Response): Promise
 router.post('/', authMiddleware, async (req: AuthenticatedRequest, res: Response): Promise<void> => {
     try {
         const userId = req.user!.id
-        const { post_id, comment_text, parent_id } = req.body
+        const { post_id, comment_text, parent_id, blog_id } = req.body
 
         if (!post_id || !comment_text) {
             res.status(400).json({ error: 'post_id and comment_text are required' })
@@ -60,7 +65,8 @@ router.post('/', authMiddleware, async (req: AuthenticatedRequest, res: Response
                 post_id,
                 user_id: userId,
                 comment_text,
-                parent_id: parent_id || null
+                parent_id: parent_id || null,
+                blog_id: blog_id || null
             })
             .select(`
                 *,
@@ -68,6 +74,11 @@ router.post('/', authMiddleware, async (req: AuthenticatedRequest, res: Response
                     id,
                     nickname,
                     profile_image_url
+                ),
+                blog:blog_id (
+                    id,
+                    name,
+                    thumbnail_url
                 )
             `)
             .single()

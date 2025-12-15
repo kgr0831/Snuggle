@@ -57,11 +57,6 @@ import PublishDrawer from '@/components/write/PublishDrawer'
 // 에디터 전용 스타일
 import '@/components/write/editor.css'
 
-interface Blog {
-    id: string
-    name: string
-}
-
 interface Category {
     id: string
     name: string
@@ -158,7 +153,28 @@ function WriteContent() {
         }
 
         init()
-    }, [router, isEditMode, editPostId])
+    }, [router, isEditMode, editPostId, fetchBlogs, showAlert])
+
+    // 블로그가 없으면 블로그 생성 페이지로 이동
+    useEffect(() => {
+        if (!isBlogLoading && !blog && user) {
+            router.push('/create-blog')
+        }
+    }, [isBlogLoading, blog, user, router])
+
+    // 선택된 블로그 변경 시 카테고리 로딩
+    useEffect(() => {
+        const loadCategories = async () => {
+            if (!blog) return
+            try {
+                const categoryData = await getCategories(blog.id)
+                setCategories(categoryData.map(c => ({ id: c.id, name: c.name })))
+            } catch (err) {
+                console.error('Failed to load categories:', err)
+            }
+        }
+        loadCategories()
+    }, [blog])
 
     // 블로그 변경 시 카테고리 로드 및 블로그 없으면 리다이렉트
     useEffect(() => {

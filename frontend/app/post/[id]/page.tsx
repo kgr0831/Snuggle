@@ -3,6 +3,7 @@
 import { useEffect, useState, useRef } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import { getPost, PostWithDetails } from '@/lib/api/posts'
+import { createClient } from '@/lib/supabase/client'
 import hljs from 'highlight.js'
 import BlogSkinProvider from '@/components/blog/BlogSkinProvider'
 import BlogHeader from '@/components/layout/BlogHeader'
@@ -18,6 +19,12 @@ import '@/styles/post-content.css'
 import '@/styles/highlight-theme.css'
 import CommentSection from '@/components/post/comments/CommentSection'
 
+interface AuthorProfile {
+    id: string
+    nickname: string | null
+    profile_image_url: string | null
+}
+
 export default function PostPage() {
     const params = useParams()
     const router = useRouter()
@@ -25,6 +32,7 @@ export default function PostPage() {
     const contentRef = useRef<HTMLElement>(null)
 
     const [postData, setPostData] = useState<PostWithDetails | null>(null)
+    const [authorProfile, setAuthorProfile] = useState<AuthorProfile | null>(null)
     const [loading, setLoading] = useState(true)
     const [notFound, setNotFound] = useState(false)
     const [isPrivateError, setIsPrivateError] = useState(false)
@@ -197,17 +205,17 @@ export default function PostPage() {
                                 className="flex items-center gap-3 transition-opacity hover:opacity-80"
                             >
                                 <div className="h-10 w-10 rounded-full overflow-hidden bg-[var(--blog-fg)]/10">
-                                    {(postData.blog.thumbnail_url || postData.profile?.profile_image_url) && (
+                                    {(postData.blog.thumbnail_url || authorProfile?.profile_image_url) && (
                                         <img
-                                            src={postData.blog.thumbnail_url || postData.profile?.profile_image_url || ''}
-                                            alt={postData.profile?.nickname || postData.blog.name}
+                                            src={postData.blog.thumbnail_url || authorProfile?.profile_image_url || ''}
+                                            alt={postData.blog.name}
                                             className="h-full w-full object-cover"
                                         />
                                     )}
                                 </div>
                                 <div>
                                     <p className="font-medium text-[var(--blog-fg)]">
-                                        {postData.profile?.nickname || postData.blog.name}
+                                        {postData.blog.name}
                                     </p>
                                     <p className="text-sm text-[var(--blog-muted)]">
                                         {formatDate(postData.created_at)}
@@ -242,7 +250,7 @@ export default function PostPage() {
                         blogDescription={(postData.blog as any).description || null}
                         authorId={postData.user_id}
                         thumbnailUrl={postData.blog.thumbnail_url}
-                        profileImageUrl={postData.profile?.profile_image_url || null}
+                        profileImageUrl={authorProfile?.profile_image_url || null}
                     />
 
                     {/* 댓글 섹션 */}
