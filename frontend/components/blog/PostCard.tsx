@@ -26,13 +26,14 @@ function getFirstParagraph(html: string): string {
   // 첫 번째 <p> 태그 내용 추출
   const pMatch = withoutImages.match(/<p[^>]*>([\s\S]*?)<\/p>/i)
   if (pMatch) {
-    // HTML 태그 제거하고 텍스트만 반환
-    const text = pMatch[1].replace(/<[^>]*>/g, '').trim()
-    if (text) return text
+    // HTML 태그 제거하고 줄바꿈을 공백으로 변환 후 첫 줄만 반환
+    const text = pMatch[1].replace(/<[^>]*>/g, '').replace(/\n/g, ' ').trim()
+    const firstLine = text.split(/[\r\n]/)[0]?.trim()
+    if (firstLine) return firstLine
   }
   // p 태그가 없으면 전체에서 HTML 제거 후 첫 줄 반환
-  const plainText = withoutImages.replace(/<[^>]*>/g, '').trim()
-  const firstLine = plainText.split('\n')[0]?.trim()
+  const plainText = withoutImages.replace(/<[^>]*>/g, '').replace(/\n/g, ' ').trim()
+  const firstLine = plainText.split(/[\r\n]/)[0]?.trim()
   return firstLine || ''
 }
 

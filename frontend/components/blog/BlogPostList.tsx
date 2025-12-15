@@ -36,9 +36,19 @@ export default function BlogPostList({ blogId, isOwner }: BlogPostListProps) {
   }
 
   const getExcerpt = (content: string, maxLength: number = 150) => {
-    const plainText = content.replace(/<[^>]*>/g, '').replace(/\n/g, ' ')
-    if (plainText.length <= maxLength) return plainText
-    return plainText.slice(0, maxLength) + '...'
+    // 코드블록, 이미지 제거
+    const withoutCode = content.replace(/<pre[\s\S]*?<\/pre>/gi, '')
+    const withoutImages = withoutCode.replace(/<img[^>]*>/gi, '')
+    // 첫 번째 <p> 태그 내용만 추출
+    const pMatch = withoutImages.match(/<p[^>]*>([\s\S]*?)<\/p>/i)
+    let firstLine = ''
+    if (pMatch) {
+      firstLine = pMatch[1].replace(/<[^>]*>/g, '').trim()
+    } else {
+      firstLine = withoutImages.replace(/<[^>]*>/g, '').trim().split(/\n/)[0] || ''
+    }
+    if (firstLine.length <= maxLength) return firstLine
+    return firstLine.slice(0, maxLength) + '...'
   }
 
   if (loading) {
@@ -103,7 +113,7 @@ export default function BlogPostList({ blogId, isOwner }: BlogPostListProps) {
                   </h3>
 
                 </div>
-                <p className="mt-1.5 line-clamp-2 text-sm text-[var(--blog-muted)]">
+                <p className="mt-1.5 line-clamp-1 text-sm text-[var(--blog-muted)]">
                   {getExcerpt(post.content, 150)}
                 </p>
                 <p className="mt-2 text-xs text-[var(--blog-muted)]" style={{ opacity: 0.7 }}>

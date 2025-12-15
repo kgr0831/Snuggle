@@ -87,7 +87,7 @@ export default function PostActionMenu({
                                 }
                                 setIsOpen(false)
                             }}
-                            className="block w-full px-4 py-2 text-left text-sm text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20"
+                            className="block w-full px-4 py-2 text-left text-sm text-red-500 hover:bg-red-500/10"
                         >
                             삭제
                         </button>

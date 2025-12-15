@@ -5,7 +5,11 @@ import { createClient } from '@/lib/supabase/client'
 import { useUserStore } from '@/lib/store/useUserStore'
 import ProfileImage from '@/components/common/ProfileImage'
 
-export default function UserMenu() {
+interface UserMenuProps {
+  variant?: 'system' | 'blog'
+}
+
+export default function UserMenu({ variant = 'system' }: UserMenuProps) {
   const { user } = useUserStore()
   const [isOpen, setIsOpen] = useState(false)
   const menuRef = useRef<HTMLDivElement>(null)
@@ -53,7 +57,13 @@ export default function UserMenu() {
       </button>
 
       {isOpen && (
-        <div className="absolute right-0 top-full z-50 mt-3 w-max min-w-56 rounded-2xl border border-black/10 bg-white p-5 shadow-xl dark:border-white/10 dark:bg-zinc-900">
+        <div
+          className={`absolute right-0 top-full z-50 mt-3 w-max min-w-56 rounded-2xl border p-5 shadow-xl ${
+            variant === 'blog'
+              ? 'border-[var(--blog-border)] bg-[var(--blog-bg)]'
+              : 'border-black/10 bg-white dark:border-white/10 dark:bg-zinc-900'
+          }`}
+        >
           {/* 프로필 정보 */}
           <div className="flex items-center gap-3">
             <ProfileImage
@@ -65,11 +75,19 @@ export default function UserMenu() {
               className="shrink-0"
             />
             <div>
-              <p className="text-base font-semibold text-black dark:text-white">
+              <p
+                className={`text-base font-semibold ${
+                  variant === 'blog' ? 'text-[var(--blog-fg)]' : 'text-black dark:text-white'
+                }`}
+              >
                 {nickname}
               </p>
               {email && (
-                <p className="whitespace-nowrap text-sm text-black/50 dark:text-white/50">
+                <p
+                  className={`whitespace-nowrap text-sm ${
+                    variant === 'blog' ? 'text-[var(--blog-muted)]' : 'text-black/50 dark:text-white/50'
+                  }`}
+                >
                   {email}
                 </p>
               )}
@@ -77,19 +95,31 @@ export default function UserMenu() {
           </div>
 
           {/* 구분선 */}
-          <div className="my-4 border-t border-black/10 dark:border-white/10" />
+          <div
+            className={`my-4 border-t ${
+              variant === 'blog' ? 'border-[var(--blog-border)]' : 'border-black/10 dark:border-white/10'
+            }`}
+          />
 
           {/* 메뉴 */}
           <div className="space-y-1">
             <a
               href="/account"
-              className="block rounded-lg px-3 py-2 text-sm text-black/70 hover:bg-black/5 dark:text-white/70 dark:hover:bg-white/5"
+              className={`block rounded-lg px-3 py-2 text-sm ${
+                variant === 'blog'
+                  ? 'text-[var(--blog-muted)] hover:bg-[var(--blog-fg)]/5 hover:text-[var(--blog-fg)]'
+                  : 'text-black/70 hover:bg-black/5 dark:text-white/70 dark:hover:bg-white/5'
+              }`}
             >
               계정 관리
             </a>
             <button
               onClick={handleLogout}
-              className="w-full rounded-lg px-3 py-2 text-left text-sm text-black/70 hover:bg-black/5 dark:text-white/70 dark:hover:bg-white/5"
+              className={`w-full rounded-lg px-3 py-2 text-left text-sm ${
+                variant === 'blog'
+                  ? 'text-[var(--blog-muted)] hover:bg-[var(--blog-fg)]/5 hover:text-[var(--blog-fg)]'
+                  : 'text-black/70 hover:bg-black/5 dark:text-white/70 dark:hover:bg-white/5'
+              }`}
             >
               로그아웃
             </button>

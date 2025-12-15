@@ -3,13 +3,8 @@
 import { useState, useEffect, useRef } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
-import dynamic from 'next/dynamic'
 import { getSearchSuggestions, SearchSuggestion } from '@/lib/api/search'
-
-const ThemeToggle = dynamic(() => import('@/components/common/ThemeToggle'), {
-    ssr: false,
-    loading: () => <div className="h-9 w-9 rounded-full bg-black/10 dark:bg-white/10" />,
-})
+import ThemeToggle from '@/components/common/ThemeToggle'
 
 interface SearchHeaderProps {
     initialQuery?: string

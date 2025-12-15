@@ -13,8 +13,12 @@ const ThemeContext = createContext<ThemeContextType | undefined>(undefined)
 
 export function useTheme() {
   const context = useContext(ThemeContext)
+  // SSR 또는 Provider 외부에서 호출 시 기본값 반환
   if (!context) {
-    throw new Error('useTheme must be used within a ThemeProvider')
+    return {
+      theme: 'dark' as const,
+      setTheme: () => {},
+    }
   }
   return context
 }

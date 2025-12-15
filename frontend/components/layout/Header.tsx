@@ -2,21 +2,17 @@
 
 import { useState, useRef, useEffect } from 'react'
 import { usePathname } from 'next/navigation'
-import dynamic from 'next/dynamic'
 import { useUserStore } from '@/lib/store/useUserStore'
 import LoginModal from '@/components/auth/LoginModal'
 import UserMenu from '@/components/auth/UserMenu'
 import SearchInputWithSuggestions from '@/components/search/SearchInputWithSuggestions'
-
-const ThemeToggle = dynamic(() => import('@/components/common/ThemeToggle'), {
-    ssr: false,
-    loading: () => <div className="h-9 w-9 rounded-full bg-black/10 dark:bg-white/10" />,
-})
+import ThemeToggle from '@/components/common/ThemeToggle'
 
 export default function Header() {
     const pathname = usePathname()
-    const { user } = useUserStore()
+    const { user, isLoading } = useUserStore()
     const [isLoginModalOpen, setIsLoginModalOpen] = useState(false)
+    const [isMounted, setIsMounted] = useState(false)
 
     // Refs for tab pill animation
     const tabContainerRef = useRef<HTMLDivElement>(null)
@@ -24,6 +20,11 @@ export default function Header() {
     const marketplaceTabRef = useRef<HTMLAnchorElement>(null)
     const [pillStyle, setPillStyle] = useState({ transform: 'translateX(0)', width: 0 })
     const [isInitialized, setIsInitialized] = useState(false)
+
+    // Track client mount
+    useEffect(() => {
+        setIsMounted(true)
+    }, [])
 
     const isMainPage = pathname === '/'
     const isForumPage = pathname.startsWith('/forum')
@@ -61,14 +62,16 @@ export default function Header() {
         return () => window.removeEventListener('resize', updatePill)
     }, [isSkinsPage, isMarketplacePage, isInitialized])
 
-    // Hide header on blog pages, post pages, management pages, and write page
+    // Hide header on blog pages, post pages, management pages, write page, and search page
     // Blog and post pages use BlogHeader with blog-specific themes
+    // Search page uses its own SearchHeader
     if (
         pathname.includes('/manage') ||
         pathname.includes('/setting') ||
         pathname === '/write' ||
         pathname.startsWith('/blog/') ||
-        pathname.startsWith('/post/')
+        pathname.startsWith('/post/') ||
+        pathname.startsWith('/search')
     ) {
         return null
     }
@@ -178,7 +181,9 @@ export default function Header() {
 
                         {/* User Menu / Login - Main Page Only */}
                         {isMainPage && (
-                            user ? (
+                            (!isMounted || isLoading) ? (
+                                <div className="h-9 w-20 rounded-full bg-black/10 dark:bg-white/10" />
+                            ) : user ? (
                                 <UserMenu />
                             ) : (
                                 <button

@@ -23,11 +23,12 @@ function getFirstParagraph(html: string): string {
     const withoutImages = withoutCode.replace(/<img[^>]*>/gi, '')
     const pMatch = withoutImages.match(/<p[^>]*>([\s\S]*?)<\/p>/i)
     if (pMatch) {
-        const text = pMatch[1].replace(/<[^>]*>/g, '').trim()
-        if (text) return text
+        const text = pMatch[1].replace(/<[^>]*>/g, '').replace(/\n/g, ' ').trim()
+        const firstLine = text.split(/[\r\n]/)[0]?.trim()
+        if (firstLine) return firstLine
     }
-    const plainText = withoutImages.replace(/<[^>]*>/g, '').trim()
-    const firstLine = plainText.split('\n')[0]?.trim()
+    const plainText = withoutImages.replace(/<[^>]*>/g, '').replace(/\n/g, ' ').trim()
+    const firstLine = plainText.split(/[\r\n]/)[0]?.trim()
     return firstLine || ''
 }
 
@@ -62,7 +63,7 @@ export default function FeedItem({ post }: FeedItemProps) {
                             {post.title}
                         </h3>
                         {preview && (
-                            <p className="mt-1 text-sm text-black/60 dark:text-white/60 line-clamp-2">
+                            <p className="mt-1 text-sm text-black/60 dark:text-white/60 line-clamp-1">
                                 {preview}
                             </p>
                         )}

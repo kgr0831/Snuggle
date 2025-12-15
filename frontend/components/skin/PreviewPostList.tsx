@@ -17,8 +17,9 @@ function formatDate(dateString: string) {
 }
 
 function extractText(html: string, maxLength: number = 100) {
-  const text = html.replace(/<[^>]*>/g, '').replace(/&nbsp;/g, ' ')
-  return text.length > maxLength ? text.slice(0, maxLength) + '...' : text
+  const text = html.replace(/<[^>]*>/g, '').replace(/&nbsp;/g, ' ').replace(/\n/g, ' ').trim()
+  const firstLine = text.split(/[\r\n]/)[0] || text
+  return firstLine.length > maxLength ? firstLine.slice(0, maxLength) + '...' : firstLine
 }
 
 export default function PreviewPostList({ cssVars, posts }: PreviewPostListProps) {
@@ -69,7 +70,7 @@ export default function PreviewPostList({ cssVars, posts }: PreviewPostListProps
                   {post.title}
                 </h3>
                 <p
-                  className="mt-1 text-sm line-clamp-2"
+                  className="mt-1 text-sm line-clamp-1"
                   style={{ color: cssVars['--blog-muted'] }}
                 >
                   {extractText(post.content || '')}

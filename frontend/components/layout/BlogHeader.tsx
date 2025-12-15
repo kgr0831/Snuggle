@@ -2,15 +2,10 @@
 
 import { useState } from 'react'
 import { usePathname } from 'next/navigation'
-import dynamic from 'next/dynamic'
 import { useUserStore } from '@/lib/store/useUserStore'
 import LoginModal from '@/components/auth/LoginModal'
 import UserMenu from '@/components/auth/UserMenu'
-
-const ThemeToggle = dynamic(() => import('@/components/common/ThemeToggle'), {
-    ssr: false,
-    loading: () => <div className="h-9 w-9 rounded-full opacity-20" style={{ backgroundColor: 'var(--blog-fg)' }} />,
-})
+import ThemeToggle from '@/components/common/ThemeToggle'
 
 interface BlogHeaderProps {
     blogName?: string
@@ -109,11 +104,11 @@ export default function BlogHeader({ blogName, blogId }: BlogHeaderProps) {
                     {/* Actions */}
                     <div className="relative z-10 flex items-center gap-3">
                         {/* Theme Toggle */}
-                        <ThemeToggle />
+                        <ThemeToggle variant="blog" />
 
                         {/* User Menu / Login */}
                         {user ? (
-                            <UserMenu />
+                            <UserMenu variant="blog" />
                         ) : (
                             <button
                                 type="button"

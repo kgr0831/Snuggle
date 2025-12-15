@@ -155,21 +155,15 @@ function WriteContent() {
                     return
                 }
             } else {
-                // 작성 모드: 로컬 스토리지 임시저장 불러오기
+                // 작성 모드: 로컬 스토리지 임시저장 자동 불러오기
                 try {
                     const saved = localStorage.getItem(DRAFT_STORAGE_KEY)
                     if (saved) {
                         const draft: DraftData = JSON.parse(saved)
-                        const loadDraft = await showConfirm('임시 저장된 글이 있습니다. 불러오시겠습니까?')
-                        if (loadDraft) {
-                            setTitle(draft.title || '')
-                            setInitialContent(draft.content || '')
-                            setCategoryIds(draft.categoryIds || [])
-                            uploadedImagesRef.current = new Set(draft.uploadedImages || [])
-                        } else {
-                            // 불러오지 않으면 임시저장 삭제
-                            localStorage.removeItem(DRAFT_STORAGE_KEY)
-                        }
+                        setTitle(draft.title || '')
+                        setInitialContent(draft.content || '')
+                        setCategoryIds(draft.categoryIds || [])
+                        uploadedImagesRef.current = new Set(draft.uploadedImages || [])
                     }
                 } catch (error) {
                     console.error('Failed to load draft:', error)
@@ -202,6 +196,36 @@ function WriteContent() {
                 },
                 addKeyboardShortcuts() {
                     return {
+                        'Tab': ({ editor }) => {
+                            const { $from } = editor.state.selection
+                            const node = $from.node($from.depth)
+
+                            // 코드블록 안에 있는지 확인
+                            if (node.type.name === 'codeBlock') {
+                                editor.commands.insertContent('  ')
+                                return true
+                            }
+                            return false
+                        },
+                        'Shift-Tab': ({ editor }) => {
+                            const { $from } = editor.state.selection
+                            const node = $from.node($from.depth)
+
+                            // 코드블록 안에 있는지 확인
+                            if (node.type.name === 'codeBlock') {
+                                // 현재 줄의 시작 위치에서 2칸 공백 제거
+                                const { state } = editor
+                                const { from } = state.selection
+                                const lineStart = state.doc.resolve(from).start()
+                                const textBefore = state.doc.textBetween(lineStart, from)
+
+                                if (textBefore.startsWith('  ')) {
+                                    editor.commands.deleteRange({ from: lineStart, to: lineStart + 2 })
+                                }
+                                return true
+                            }
+                            return false
+                        },
                         'Mod-a': ({ editor }) => {
                             const { $from } = editor.state.selection
                             const node = $from.node($from.depth)

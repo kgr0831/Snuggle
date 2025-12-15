@@ -189,3 +189,88 @@
     color: #ffdcd7;
     background-color: #67060c;
 }
+
+/*
+ * 블로그 스킨 영역
+ * 시스템 다크 모드와 독립적으로 블로그 스킨 배경에 맞춰 적용
+ * --blog-is-dark CSS 변수로 제어 (1 = 어두운 테마, 0 = 밝은 테마)
+ */
+
+/* 블로그 스킨 영역에서는 시스템 다크 모드 무시하고 스킨 테마 사용 */
+.blog-skin-scope .hljs {
+    color: var(--blog-code-fg, #24292e);
+    background: transparent;
+}
+
+.blog-skin-scope .hljs-doctag,
+.blog-skin-scope .hljs-keyword,
+.blog-skin-scope .hljs-meta .hljs-keyword,
+.blog-skin-scope .hljs-template-tag,
+.blog-skin-scope .hljs-template-variable,
+.blog-skin-scope .hljs-type,
+.blog-skin-scope .hljs-variable.language_ {
+    color: var(--blog-code-keyword, #d73a49);
+}
+
+.blog-skin-scope .hljs-title,
+.blog-skin-scope .hljs-title.class_,
+.blog-skin-scope .hljs-title.class_.inherited__,
+.blog-skin-scope .hljs-title.function_ {
+    color: var(--blog-code-function, #6f42c1);
+}
+
+.blog-skin-scope .hljs-attr,
+.blog-skin-scope .hljs-attribute,
+.blog-skin-scope .hljs-literal,
+.blog-skin-scope .hljs-meta,
+.blog-skin-scope .hljs-number,
+.blog-skin-scope .hljs-operator,
+.blog-skin-scope .hljs-selector-attr,
+.blog-skin-scope .hljs-selector-class,
+.blog-skin-scope .hljs-selector-id,
+.blog-skin-scope .hljs-variable {
+    color: var(--blog-code-attr, #005cc5);
+}
+
+.blog-skin-scope .hljs-meta .hljs-string,
+.blog-skin-scope .hljs-regexp,
+.blog-skin-scope .hljs-string {
+    color: var(--blog-code-string, #032f62);
+}
+
+.blog-skin-scope .hljs-built_in,
+.blog-skin-scope .hljs-symbol {
+    color: var(--blog-code-builtin, #e36209);
+}
+
+.blog-skin-scope .hljs-code,
+.blog-skin-scope .hljs-comment,
+.blog-skin-scope .hljs-formula {
+    color: var(--blog-code-comment, #6a737d);
+}
+
+.blog-skin-scope .hljs-name,
+.blog-skin-scope .hljs-quote,
+.blog-skin-scope .hljs-selector-pseudo,
+.blog-skin-scope .hljs-selector-tag {
+    color: var(--blog-code-tag, #22863a);
+}
+
+.blog-skin-scope .hljs-subst {
+    color: var(--blog-code-fg, #24292e);
+}
+
+.blog-skin-scope .hljs-section {
+    color: var(--blog-code-attr, #005cc5);
+    font-weight: bold;
+}
+
+.blog-skin-scope .hljs-emphasis {
+    color: var(--blog-code-fg, #24292e);
+    font-style: italic;
+}
+
+.blog-skin-scope .hljs-strong {
+    color: var(--blog-code-fg, #24292e);
+    font-weight: bold;
+}

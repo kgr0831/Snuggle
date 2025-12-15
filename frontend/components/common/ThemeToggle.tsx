@@ -3,10 +3,19 @@
 import { useState, useRef, useEffect } from 'react'
 import { useTheme } from './ThemeProvider'
 
-export default function ThemeToggle() {
+interface ThemeToggleProps {
+  variant?: 'system' | 'blog'
+}
+
+export default function ThemeToggle({ variant = 'system' }: ThemeToggleProps) {
   const { theme, setTheme } = useTheme()
   const [isOpen, setIsOpen] = useState(false)
+  const [mounted, setMounted] = useState(false)
   const menuRef = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    setMounted(true)
+  }, [])
 
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
@@ -26,18 +35,45 @@ export default function ThemeToggle() {
 
   const CurrentIcon = themes.find((t) => t.id === theme)?.icon || MoonIcon
 
+  // SSR/hydration mismatch 방지
+  if (!mounted) {
+    const placeholderClass = variant === 'blog'
+      ? 'h-9 w-9 rounded-full bg-[var(--blog-fg)]/10'
+      : 'h-9 w-9 rounded-full bg-black/10 dark:bg-white/10'
+    return <div className={placeholderClass} />
+  }
+
+  const buttonClass = variant === 'blog'
+    ? 'flex h-9 w-9 items-center justify-center rounded-full text-[var(--blog-muted)] transition-colors hover:bg-[var(--blog-fg)]/5 hover:text-[var(--blog-fg)]'
+    : 'flex h-9 w-9 items-center justify-center rounded-full text-black/60 transition-colors hover:bg-black/5 hover:text-black dark:text-white/60 dark:hover:bg-white/5 dark:hover:text-white'
+
+  const dropdownClass = variant === 'blog'
+    ? 'absolute right-0 top-full z-50 mt-2 flex gap-1 rounded-full border border-[var(--blog-border)] bg-[var(--blog-bg)] p-1 shadow-lg'
+    : 'absolute right-0 top-full z-50 mt-2 flex gap-1 rounded-full border border-black/10 bg-white p-1 shadow-lg dark:border-white/10 dark:bg-zinc-900'
+
+  const getItemClass = (isActive: boolean) => {
+    if (variant === 'blog') {
+      return isActive
+        ? 'flex h-8 w-8 items-center justify-center rounded-full transition-colors bg-[var(--blog-fg)]/10 text-[var(--blog-fg)]'
+        : 'flex h-8 w-8 items-center justify-center rounded-full transition-colors text-[var(--blog-muted)] hover:text-[var(--blog-fg)]'
+    }
+    return isActive
+      ? 'flex h-8 w-8 items-center justify-center rounded-full transition-colors bg-black/10 text-black dark:bg-white/10 dark:text-white'
+      : 'flex h-8 w-8 items-center justify-center rounded-full transition-colors text-black/40 hover:text-black dark:text-white/40 dark:hover:text-white'
+  }
+
   return (
     <div className="relative" ref={menuRef}>
       <button
         onClick={() => setIsOpen(!isOpen)}
-        className="flex h-9 w-9 items-center justify-center rounded-full text-black/60 transition-colors hover:bg-black/5 hover:text-black dark:text-white/60 dark:hover:bg-white/5 dark:hover:text-white"
+        className={buttonClass}
         aria-label="테마 변경"
       >
         <CurrentIcon />
       </button>
 
       {isOpen && (
-        <div className="absolute right-0 top-full z-50 mt-2 flex gap-1 rounded-full border border-black/10 bg-white p-1 shadow-lg dark:border-white/10 dark:bg-zinc-900">
+        <div className={dropdownClass}>
           {themes.map(({ id, icon: Icon }) => (
             <button
               key={id}
@@ -45,11 +81,7 @@ export default function ThemeToggle() {
                 setTheme(id)
                 setIsOpen(false)
               }}
-              className={`flex h-8 w-8 items-center justify-center rounded-full transition-colors ${
-                theme === id
-                  ? 'bg-black/10 text-black dark:bg-white/10 dark:text-white'
-                  : 'text-black/40 hover:text-black dark:text-white/40 dark:hover:text-white'
-              }`}
+              className={getItemClass(theme === id)}
               aria-label={id}
             >
               <Icon />
