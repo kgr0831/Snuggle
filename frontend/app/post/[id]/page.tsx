@@ -19,12 +19,6 @@ import '@/styles/post-content.css'
 import '@/styles/highlight-theme.css'
 import CommentSection from '@/components/post/comments/CommentSection'
 
-interface AuthorProfile {
-    id: string
-    nickname: string | null
-    profile_image_url: string | null
-}
-
 export default function PostPage() {
     const params = useParams()
     const router = useRouter()
@@ -32,7 +26,6 @@ export default function PostPage() {
     const contentRef = useRef<HTMLElement>(null)
 
     const [postData, setPostData] = useState<PostWithDetails | null>(null)
-    const [authorProfile, setAuthorProfile] = useState<AuthorProfile | null>(null)
     const [loading, setLoading] = useState(true)
     const [notFound, setNotFound] = useState(false)
     const [isPrivateError, setIsPrivateError] = useState(false)
@@ -56,10 +49,9 @@ export default function PostPage() {
                 }
                 setPostData(data)
             } catch (err: any) {
-                if (err.message === 'Private') {
+                if (err.message === 'Private' || err.message?.includes('Private')) {
                     setIsPrivateError(true)
                 } else {
-                    console.error('Failed to load post:', err)
                     setNotFound(true)
                 }
             }
@@ -205,9 +197,9 @@ export default function PostPage() {
                                 className="flex items-center gap-3 transition-opacity hover:opacity-80"
                             >
                                 <div className="h-10 w-10 rounded-full overflow-hidden bg-[var(--blog-fg)]/10">
-                                    {(postData.blog.thumbnail_url || authorProfile?.profile_image_url) && (
+                                    {(postData.blog.thumbnail_url || postData.profile?.profile_image_url) && (
                                         <img
-                                            src={postData.blog.thumbnail_url || authorProfile?.profile_image_url || ''}
+                                            src={postData.blog.thumbnail_url || postData.profile?.profile_image_url || ''}
                                             alt={postData.blog.name}
                                             className="h-full w-full object-cover"
                                         />
@@ -250,7 +242,7 @@ export default function PostPage() {
                         blogDescription={(postData.blog as any).description || null}
                         authorId={postData.user_id}
                         thumbnailUrl={postData.blog.thumbnail_url}
-                        profileImageUrl={authorProfile?.profile_image_url || null}
+                        profileImageUrl={postData.profile?.profile_image_url || null}
                     />
 
                     {/* 댓글 섹션 */}
