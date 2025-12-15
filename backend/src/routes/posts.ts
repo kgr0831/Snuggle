@@ -282,8 +282,7 @@ router.get('/:id', async (req: Request, res: Response): Promise<void> => {
       .from('posts')
       .select(`
         *,
-        blog:blogs ( id, user_id, name, thumbnail_url ),
-        category:categories ( id, name )
+        blog:blogs ( id, user_id, name, thumbnail_url, description )
       `)
       .eq('id', id)
       .single()
@@ -293,9 +292,21 @@ router.get('/:id', async (req: Request, res: Response): Promise<void> => {
       return
     }
 
+    // 다중 카테고리 조회 (post_categories 테이블 사용)
+    const { data: postCategories } = await supabase
+      .from('post_categories')
+      .select(`
+        category:categories ( id, name )
+      `)
+      .eq('post_id', id)
+
+    const categories = (postCategories || [])
+      .map((pc: any) => pc.category)
+      .filter(Boolean)
+
     const typedPost = post as Post & {
-      blog: Pick<Blog, 'id' | 'user_id' | 'name' | 'thumbnail_url'> | null
-      category: Pick<Category, 'id' | 'name'> | null
+      blog: Pick<Blog, 'id' | 'user_id' | 'name' | 'thumbnail_url'> & { description?: string } | null
+      categories: Pick<Category, 'id' | 'name'>[]
     }
 
     if (!typedPost.blog) {
@@ -383,6 +394,7 @@ router.get('/:id', async (req: Request, res: Response): Promise<void> => {
 
     res.json({
       ...typedPost,
+      categories,
       profile,
       prev_post: prevPost || null,
       next_post: nextPost || null,
