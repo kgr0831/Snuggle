@@ -1,7 +1,8 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useUserStore } from '@/lib/store/useUserStore'
+import { createClient } from '@/lib/supabase/client'
 import { useModal } from '@/components/common/Modal'
 
 interface CommentFormProps {
@@ -11,6 +12,11 @@ interface CommentFormProps {
     loading?: boolean
     autoFocus?: boolean
     onCancel?: () => void
+}
+
+interface MyBlog {
+    name: string
+    thumbnail_url: string | null
 }
 
 export default function CommentForm({
@@ -24,6 +30,43 @@ export default function CommentForm({
     const { user } = useUserStore()
     const { showAlert } = useModal()
     const [text, setText] = useState('')
+    const [myBlog, setMyBlog] = useState<MyBlog | null>(null)
+    const [isBlogLoading, setIsBlogLoading] = useState(true)
+
+    // 내 블로그 정보 직접 가져오기
+    useEffect(() => {
+        const fetchMyBlog = async () => {
+            if (!user) {
+                setIsBlogLoading(false)
+                return
+            }
+
+            const supabase = createClient()
+
+            // localStorage에서 선택된 블로그 ID 확인
+            const savedBlogId = localStorage.getItem('snuggle_selected_blog_id')
+
+            let query = supabase
+                .from('blogs')
+                .select('name, thumbnail_url')
+                .eq('user_id', user.id)
+                .is('deleted_at', null)
+
+            if (savedBlogId) {
+                // 선택된 블로그가 있으면 해당 블로그 가져오기
+                query = query.eq('id', savedBlogId)
+            }
+
+            const { data } = await query.limit(1)
+
+            if (data && data.length > 0) {
+                setMyBlog(data[0])
+            }
+            setIsBlogLoading(false)
+        }
+
+        fetchMyBlog()
+    }, [user])
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault()
@@ -46,9 +89,9 @@ export default function CommentForm({
         }
     }
 
-    // 사용자 정보 안전하게 가져오기 (타입 정의가 명확하지 않은 경우 user_metadata 참조)
-    const nickname = user?.user_metadata?.nickname || user?.user_metadata?.name || 'User'
-    const profileImage = user?.user_metadata?.avatar_url || user?.user_metadata?.picture
+    // 내 블로그 이름 사용, 없으면 user_metadata에서 가져오기
+    const displayName = myBlog?.name || user?.user_metadata?.nickname || user?.user_metadata?.name || 'User'
+    const profileImage = myBlog?.thumbnail_url || user?.user_metadata?.avatar_url || user?.user_metadata?.picture
 
     return (
         <form onSubmit={handleSubmit} className="relative">
@@ -59,14 +102,23 @@ export default function CommentForm({
             ) : (
                 <div className="rounded-lg border border-[var(--blog-border)] bg-[var(--blog-card-bg)] p-4 focus-within:ring-1 focus-within:ring-[var(--blog-fg)]">
                     <div className="mb-2 flex items-center gap-2">
-                        {profileImage ? (
-                            <img src={profileImage} alt={nickname} className="h-6 w-6 rounded-full object-cover" />
+                        {isBlogLoading ? (
+                            <>
+                                <div className="h-6 w-6 rounded-full bg-[var(--blog-fg)]/10 animate-pulse" />
+                                <div className="h-4 w-16 rounded bg-[var(--blog-fg)]/10 animate-pulse" />
+                            </>
                         ) : (
-                            <div className="flex h-6 w-6 items-center justify-center rounded-full bg-[var(--blog-fg)]/10 text-xs font-bold text-[var(--blog-muted)]">
-                                {(nickname || 'U').charAt(0)}
-                            </div>
+                            <>
+                                {profileImage ? (
+                                    <img src={profileImage} alt={displayName} className="h-6 w-6 rounded-full object-cover" />
+                                ) : (
+                                    <div className="flex h-6 w-6 items-center justify-center rounded-full bg-[var(--blog-fg)]/10 text-xs font-bold text-[var(--blog-muted)]">
+                                        {(displayName || 'U').charAt(0)}
+                                    </div>
+                                )}
+                                <span className="text-sm font-bold text-[var(--blog-fg)]">{displayName}</span>
+                            </>
                         )}
-                        <span className="text-sm font-bold text-[var(--blog-fg)]">{nickname}</span>
                     </div>
                     <textarea
                         value={text}

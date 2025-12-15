@@ -57,11 +57,6 @@ import PublishDrawer from '@/components/write/PublishDrawer'
 // 에디터 전용 스타일
 import '@/components/write/editor.css'
 
-interface Blog {
-    id: string
-    name: string
-}
-
 interface Category {
     id: string
     name: string
@@ -158,7 +153,28 @@ function WriteContent() {
         }
 
         init()
-    }, [router, isEditMode, editPostId])
+    }, [router, isEditMode, editPostId, fetchBlogs, showAlert])
+
+    // 블로그가 없으면 블로그 생성 페이지로 이동
+    useEffect(() => {
+        if (!isBlogLoading && !selectedBlog && user) {
+            router.push('/create-blog')
+        }
+    }, [isBlogLoading, selectedBlog, user, router])
+
+    // 선택된 블로그 변경 시 카테고리 로딩
+    useEffect(() => {
+        const loadCategories = async () => {
+            if (!selectedBlog) return
+            try {
+                const categoryData = await getCategories(selectedBlog.id)
+                setCategories(categoryData.map(c => ({ id: c.id, name: c.name })))
+            } catch (err) {
+                console.error('Failed to load categories:', err)
+            }
+        }
+        loadCategories()
+    }, [selectedBlog])
 
     // 블로그 변경 시 카테고리 로드 및 블로그 없으면 리다이렉트
     useEffect(() => {
@@ -418,10 +434,10 @@ function WriteContent() {
 
     // 새 카테고리 추가
     const handleAddCategory = async (name: string): Promise<Category | null> => {
-        if (!blog) return null
+        if (!selectedBlog) return null
 
         try {
-            const data = await createCategory(blog.id, name)
+            const data = await createCategory(selectedBlog.id, name)
             const newCategory = { id: data.id, name: data.name }
             setCategories(prev => [...prev, newCategory].sort((a, b) => a.name.localeCompare(b.name)))
             return newCategory
@@ -469,7 +485,7 @@ function WriteContent() {
         allowComments: boolean
         thumbnailUrl: string | null
     }) => {
-        if (!editor || !blog) return
+        if (!editor || !selectedBlog) return
 
         const content = editor.getHTML()
         setSaving(true)
@@ -490,7 +506,7 @@ function WriteContent() {
             } else {
                 // 생성
                 await createPost({
-                    blog_id: blog.id,
+                    blog_id: selectedBlog.id,
                     title: title.trim(),
                     content: content,
                     category_ids: categoryIds,
@@ -508,7 +524,7 @@ function WriteContent() {
             if (isEditMode) {
                 router.push(`/post/${editPostId}`)
             } else {
-                router.push(`/blog/${blog.id}`)
+                router.push(`/blog/${selectedBlog.id}`)
             }
 
         } catch (error) {
