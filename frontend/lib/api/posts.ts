@@ -44,6 +44,9 @@ export interface PostWithDetails extends Post {
     nickname: string | null
     profile_image_url: string | null
   } | null
+  prev_post?: { id: string; title: string } | null
+  next_post?: { id: string; title: string } | null
+  is_liked?: boolean
 }
 
 export interface PostListItem {
@@ -262,6 +265,27 @@ export async function getFeedPosts(limit = 14, offset = 0): Promise<PostListItem
 
   if (!response.ok) {
     throw new Error('Failed to fetch feed')
+  }
+
+  return response.json()
+}
+
+// 좋아요 토글
+export async function toggleLike(postId: string): Promise<{ success: boolean; is_liked: boolean; like_count: number }> {
+  const token = await getAuthToken()
+  if (!token) throw new Error('Not authenticated')
+
+  const response = await fetch(`${API_URL}/api/posts/${postId}/like`, {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${token}`,
+    },
+  })
+
+  if (!response.ok) {
+    const errorData = await response.json().catch(() => ({}))
+    console.error('Like toggle failed:', errorData)
+    throw new Error(errorData.details || errorData.error || 'Failed to toggle like')
   }
 
   return response.json()

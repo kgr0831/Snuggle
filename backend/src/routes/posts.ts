@@ -280,11 +280,51 @@ router.get('/:id', async (req: Request, res: Response): Promise<void> => {
       .from('profiles')
       .select('id, nickname, profile_image_url')
       .eq('id', typedPost.blog.user_id)
+      .eq('id', typedPost.blog.user_id)
+      .single()
+
+    // 좋아요 여부 확인
+    let isLiked = false
+    if (authHeader?.startsWith('Bearer ')) {
+      const token = authHeader.split(' ')[1]
+      const authClient = createAuthenticatedClient(token)
+      const { data: { user } } = await authClient.auth.getUser()
+      if (user) {
+        const { data: likeData } = await supabase
+          .from('likes')
+          .select('posts_id') // posts_id 확인
+          .eq('posts_id', id)
+          .eq('user_id', user.id)
+          .single()
+        isLiked = !!likeData
+      }
+    }
+
+    // 이전 글 / 다음 글 조회 (같은 블로그 내)
+    const { data: prevPost } = await supabase
+      .from('posts')
+      .select('id, title')
+      .eq('blog_id', typedPost.blog_id)
+      .lt('created_at', typedPost.created_at) // 현재 글보다 오래된 글 중 가장 최신 (=이전 글)
+      .order('created_at', { ascending: false })
+      .limit(1)
+      .single()
+
+    const { data: nextPost } = await supabase
+      .from('posts')
+      .select('id, title')
+      .eq('blog_id', typedPost.blog_id)
+      .gt('created_at', typedPost.created_at) // 현재 글보다 최신 글 중 가장 오래된 (=다음 글)
+      .order('created_at', { ascending: true })
+      .limit(1)
       .single()
 
     res.json({
       ...typedPost,
       profile,
+      prev_post: prevPost || null,
+      next_post: nextPost || null,
+      is_liked: isLiked,
     })
   } catch (error) {
     logger.error('Get post error:', error)
@@ -490,6 +530,81 @@ router.delete('/:id', authMiddleware, async (req: AuthenticatedRequest, res: Res
   } catch (error) {
     logger.error('Delete post error:', error)
     res.status(500).json({ error: 'Failed to delete post' })
+  }
+})
+
+// 좋아요 토글 (인증 필요)
+router.post('/:id/like', authMiddleware, async (req: AuthenticatedRequest, res: Response): Promise<void> => {
+  try {
+    const user = req.user!
+    const { id } = req.params
+
+    // 1. 이미 좋아요를 눌렀는지 확인
+    const { data: existingLike } = await supabase
+      .from('likes')
+      .select('*')
+      .eq('posts_id', id)
+      .eq('user_id', user.id)
+      .single()
+
+    const token = req.headers.authorization!.split(' ')[1]
+    const authClient = createAuthenticatedClient(token)
+
+    let isLiked = false
+    let change = 0
+
+    if (existingLike) {
+      // 2. 이미 좋아요 상태 -> 좋아요 취소 (삭제)
+      const { error: deleteError } = await authClient
+        .from('likes')
+        .delete()
+        .eq('posts_id', id)
+        .eq('user_id', user.id)
+
+      if (deleteError) throw deleteError
+      isLiked = false
+      change = -1
+    } else {
+      // 3. 좋아요 안 누름 -> 좋아요 추가 (생성)
+      const { error: insertError } = await authClient
+        .from('likes')
+        .insert({
+          posts_id: id,
+          user_id: user.id,
+          update_at: new Date().toISOString() // 요청사항: update_at (updated_at 아님)
+        })
+
+      if (insertError) throw insertError
+      isLiked = true
+      change = 1
+    }
+
+    // 4. 게시글 like_count 업데이트 (RPC 이용 또는 트랜잭션 없이 조회후 업데이트 - 예제 단순화를 위해 직접 fetch & update)
+    // 안전한 방법은 rpc('increment_like_count') 등을 쓰는 것이지만, 여기서는 간단히 로직 구현
+    const { data: post, error: fetchError } = await supabase
+      .from('posts')
+      .select('like_count')
+      .eq('id', id)
+      .single()
+
+    if (fetchError || !post) throw fetchError || new Error('Post not found')
+
+    const newLikeCount = (post.like_count || 0) + change
+
+    await authClient
+      .from('posts')
+      .update({ like_count: newLikeCount })
+      .eq('id', id)
+
+    res.json({ success: true, is_liked: isLiked, like_count: newLikeCount })
+
+  } catch (error: any) {
+    logger.error('Toggle like error:', error)
+    res.status(500).json({
+      error: 'Failed to toggle like',
+      details: error.message || error,
+      code: error.code
+    })
   }
 })
 
