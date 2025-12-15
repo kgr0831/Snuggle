@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback } from 'react'
 import { Comment, getComments, createComment, deleteComment } from '@/lib/api/comments'
+import { createClient } from '@/lib/supabase/client'
 import CommentForm from './CommentForm'
 import CommentItem from './CommentItem'
 import { useUserStore } from '@/lib/store/useUserStore'
@@ -11,23 +12,61 @@ interface CommentSectionProps {
     postId: string
 }
 
+interface BlogInfo {
+    id: string
+    name: string
+    thumbnail_url: string | null
+}
+
 export default function CommentSection({ postId }: CommentSectionProps) {
     const { user } = useUserStore()
     const { showAlert } = useModal()
     const [comments, setComments] = useState<Comment[]>([])
+    const [blogMap, setBlogMap] = useState<Map<string, BlogInfo>>(new Map())
     const [loading, setLoading] = useState(true)
     const [submitting, setSubmitting] = useState(false)
+
+    // 댓글 작성자들의 블로그 정보 가져오기
+    const fetchBlogInfo = useCallback(async (userIds: string[]) => {
+        if (userIds.length === 0) return
+
+        const supabase = createClient()
+        const { data: blogs } = await supabase
+            .from('blogs')
+            .select('id, name, thumbnail_url, user_id')
+            .in('user_id', userIds)
+            .is('deleted_at', null)
+
+        if (blogs) {
+            const map = new Map<string, BlogInfo>()
+            blogs.forEach(blog => {
+                // 각 사용자의 첫 번째 블로그만 저장
+                if (!map.has(blog.user_id)) {
+                    map.set(blog.user_id, {
+                        id: blog.id,
+                        name: blog.name,
+                        thumbnail_url: blog.thumbnail_url
+                    })
+                }
+            })
+            setBlogMap(map)
+        }
+    }, [])
 
     const fetchComments = useCallback(async () => {
         try {
             const data = await getComments(postId)
             setComments(data)
+
+            // 댓글 작성자들의 블로그 정보 가져오기
+            const userIds = [...new Set(data.map(c => c.user_id))]
+            await fetchBlogInfo(userIds)
         } catch (err) {
             console.error(err)
         } finally {
             setLoading(false)
         }
-    }, [postId])
+    }, [postId, fetchBlogInfo])
 
     useEffect(() => {
         fetchComments()
@@ -95,6 +134,7 @@ export default function CommentSection({ postId }: CommentSectionProps) {
                             comment={comment}
                             replies={comments.filter(c => c.parent_id === comment.id)}
                             allComments={comments}
+                            blogMap={blogMap}
                             onReply={handleReply}
                             onDelete={handleDelete}
                         />

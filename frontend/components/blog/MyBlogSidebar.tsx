@@ -1,25 +1,14 @@
 'use client'
 
-import { useEffect, useState, useRef } from 'react'
-import { createClient } from '@/lib/supabase/client'
+import { useEffect, useRef, useState } from 'react'
 import { useUserStore } from '@/lib/store/useUserStore'
+import { useBlogStore, Blog } from '@/lib/store/useBlogStore'
 import ProfileImage from '@/components/common/ProfileImage'
 import KakaoLoginButton from '@/components/auth/KakaoLoginButton'
 
-interface Blog {
-  id: string
-  name: string
-  description: string | null
-  thumbnail_url: string | null
-}
-
-const SELECTED_BLOG_KEY = 'snuggle_selected_blog_id'
-
 export default function MyBlogSidebar() {
   const { user, isLoading: isUserLoading } = useUserStore()
-  const [blogs, setBlogs] = useState<Blog[]>([])
-  const [selectedBlog, setSelectedBlog] = useState<Blog | null>(null)
-  const [loading, setLoading] = useState(true)
+  const { blogs, selectedBlog, isLoading: isBlogLoading, fetchBlogs, selectBlog } = useBlogStore()
   const [isDropdownOpen, setIsDropdownOpen] = useState(false)
   const dropdownRef = useRef<HTMLDivElement>(null)
 
@@ -27,33 +16,11 @@ export default function MyBlogSidebar() {
     if (isUserLoading) return
 
     if (!user) {
-      setLoading(false)
       return
     }
 
-    const fetchBlog = async () => {
-      const supabase = createClient()
-
-      const { data, error } = await supabase
-        .from('blogs')
-        .select('id, name, description, thumbnail_url')
-        .eq('user_id', user.id)
-        .is('deleted_at', null)
-        .order('created_at', { ascending: true })
-
-      if (!error && data && data.length > 0) {
-        setBlogs(data)
-
-        // localStorage에서 이전 선택 복원
-        const savedBlogId = localStorage.getItem(SELECTED_BLOG_KEY)
-        const savedBlog = data.find(b => b.id === savedBlogId)
-        setSelectedBlog(savedBlog || data[0])
-      }
-      setLoading(false)
-    }
-
-    fetchBlog()
-  }, [user, isUserLoading])
+    fetchBlogs(user.id)
+  }, [user, isUserLoading, fetchBlogs])
 
   // 드롭다운 외부 클릭 감지
   useEffect(() => {
@@ -68,13 +35,12 @@ export default function MyBlogSidebar() {
   }, [])
 
   const handleSelectBlog = (blog: Blog) => {
-    setSelectedBlog(blog)
-    localStorage.setItem(SELECTED_BLOG_KEY, blog.id)
+    selectBlog(blog)
     setIsDropdownOpen(false)
   }
 
   // 유저 로딩 중이거나 블로그 로딩 중
-  if (isUserLoading || loading) {
+  if (isUserLoading || isBlogLoading) {
     return (
       <div className="animate-pulse rounded-2xl border border-black/10 p-6 dark:border-white/10">
         <div className="h-5 w-20 rounded bg-black/10 dark:bg-white/10" />

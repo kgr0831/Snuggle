@@ -17,6 +17,7 @@ import { uploadTempImage, deleteTempImage } from '@/lib/api/upload'
 import { createPost, getPost, updatePost } from '@/lib/api/posts'
 import { getCategories, createCategory } from '@/lib/api/categories'
 import { useModal } from '@/components/common/Modal'
+import { useBlogStore } from '@/lib/store/useBlogStore'
 
 // highlight.js 커스텀 테마 (라이트/다크 모드 지원)
 import '@/styles/highlight-theme.css'
@@ -56,11 +57,6 @@ import PublishDrawer from '@/components/write/PublishDrawer'
 // 에디터 전용 스타일
 import '@/components/write/editor.css'
 
-interface Blog {
-    id: string
-    name: string
-}
-
 interface Category {
     id: string
     name: string
@@ -81,8 +77,10 @@ function WriteContent() {
     const isEditMode = !!editPostId
     const { showAlert, showConfirm } = useModal()
 
+    // 글로벌 블로그 스토어 사용
+    const { selectedBlog, isLoading: isBlogLoading, fetchBlogs } = useBlogStore()
+
     const [user, setUser] = useState<User | null>(null)
-    const [blog, setBlog] = useState<Blog | null>(null)
     const [title, setTitle] = useState('')
     const [categoryIds, setCategoryIds] = useState<string[]>([])
     const [categories, setCategories] = useState<Category[]>([])
@@ -107,27 +105,8 @@ function WriteContent() {
 
             setUser(user)
 
-            // 블로그 정보 가져오기
-            const { data: blogData } = await supabase
-                .from('blogs')
-                .select('id, name')
-                .eq('user_id', user.id)
-                .single()
-
-            if (!blogData) {
-                router.push('/create-blog')
-                return
-            }
-
-            setBlog(blogData)
-
-            // 카테고리 정보 가져오기
-            try {
-                const categoryData = await getCategories(blogData.id)
-                setCategories(categoryData.map(c => ({ id: c.id, name: c.name })))
-            } catch (err) {
-                console.error('Failed to load categories:', err)
-            }
+            // 블로그 스토어에서 블로그 정보 가져오기
+            await fetchBlogs(user.id)
 
             // 수정 모드: 기존 글 데이터 불러오기
             if (isEditMode) {
@@ -174,7 +153,28 @@ function WriteContent() {
         }
 
         init()
-    }, [router, isEditMode, editPostId])
+    }, [router, isEditMode, editPostId, fetchBlogs, showAlert])
+
+    // 블로그가 없으면 블로그 생성 페이지로 이동
+    useEffect(() => {
+        if (!isBlogLoading && !selectedBlog && user) {
+            router.push('/create-blog')
+        }
+    }, [isBlogLoading, selectedBlog, user, router])
+
+    // 선택된 블로그 변경 시 카테고리 로딩
+    useEffect(() => {
+        const loadCategories = async () => {
+            if (!selectedBlog) return
+            try {
+                const categoryData = await getCategories(selectedBlog.id)
+                setCategories(categoryData.map(c => ({ id: c.id, name: c.name })))
+            } catch (err) {
+                console.error('Failed to load categories:', err)
+            }
+        }
+        loadCategories()
+    }, [selectedBlog])
 
     // 에디터에 초기 콘텐츠 설정
     useEffect(() => {
@@ -412,10 +412,10 @@ function WriteContent() {
 
     // 새 카테고리 추가
     const handleAddCategory = async (name: string): Promise<Category | null> => {
-        if (!blog) return null
+        if (!selectedBlog) return null
 
         try {
-            const data = await createCategory(blog.id, name)
+            const data = await createCategory(selectedBlog.id, name)
             const newCategory = { id: data.id, name: data.name }
             setCategories(prev => [...prev, newCategory].sort((a, b) => a.name.localeCompare(b.name)))
             return newCategory
@@ -463,7 +463,7 @@ function WriteContent() {
         allowComments: boolean
         thumbnailUrl: string | null
     }) => {
-        if (!editor || !blog) return
+        if (!editor || !selectedBlog) return
 
         const content = editor.getHTML()
         setSaving(true)
@@ -484,7 +484,7 @@ function WriteContent() {
             } else {
                 // 생성
                 await createPost({
-                    blog_id: blog.id,
+                    blog_id: selectedBlog.id,
                     title: title.trim(),
                     content: content,
                     category_ids: categoryIds,
@@ -502,7 +502,7 @@ function WriteContent() {
             if (isEditMode) {
                 router.push(`/post/${editPostId}`)
             } else {
-                router.push(`/blog/${blog.id}`)
+                router.push(`/blog/${selectedBlog.id}`)
             }
 
         } catch (error) {
