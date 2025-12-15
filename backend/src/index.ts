@@ -9,6 +9,7 @@ import skinsRouter from './routes/skins.js'
 import searchRouter from './routes/search.js'
 import subscribeRouter from './routes/subscribe.js'
 import forumRouter from './routes/forum.js'
+import commentsRouter from './routes/comments.js'
 import { startCleanupScheduler } from './services/scheduler.service.js'
 import { logger } from './utils/logger.js'
 
@@ -31,6 +32,7 @@ app.use('/api/skins', skinsRouter)
 app.use('/api/search', searchRouter)
 app.use('/api/subscribe', subscribeRouter)
 app.use('/api/forum', forumRouter)
+app.use('/api/comments', commentsRouter)
 
 // Health check
 app.get('/health', (req, res) => {

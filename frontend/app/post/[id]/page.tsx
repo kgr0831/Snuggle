@@ -16,6 +16,7 @@ import SubscriptionCard from '@/components/post/SubscriptionCard'
 // 게시글 컨텐츠 스타일
 import '@/styles/post-content.css'
 import '@/styles/highlight-theme.css'
+import CommentSection from '@/components/post/comments/CommentSection'
 
 export default function PostPage() {
     const params = useParams()
@@ -212,6 +213,9 @@ export default function PostPage() {
                         thumbnailUrl={postData.blog.thumbnail_url}
                         profileImageUrl={postData.profile?.profile_image_url || null}
                     />
+
+                    {/* 댓글 섹션 */}
+                    <CommentSection postId={postId} />
 
                     {/* 하단 네비게이션 */}
                     <div className="mt-16 flex items-center justify-between border-t border-[var(--blog-border)] pt-8">
