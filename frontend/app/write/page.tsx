@@ -155,21 +155,15 @@ function WriteContent() {
                     return
                 }
             } else {
-                // 작성 모드: 로컬 스토리지 임시저장 불러오기
+                // 작성 모드: 로컬 스토리지 임시저장 자동 불러오기
                 try {
                     const saved = localStorage.getItem(DRAFT_STORAGE_KEY)
                     if (saved) {
                         const draft: DraftData = JSON.parse(saved)
-                        const loadDraft = await showConfirm('임시 저장된 글이 있습니다. 불러오시겠습니까?')
-                        if (loadDraft) {
-                            setTitle(draft.title || '')
-                            setInitialContent(draft.content || '')
-                            setCategoryIds(draft.categoryIds || [])
-                            uploadedImagesRef.current = new Set(draft.uploadedImages || [])
-                        } else {
-                            // 불러오지 않으면 임시저장 삭제
-                            localStorage.removeItem(DRAFT_STORAGE_KEY)
-                        }
+                        setTitle(draft.title || '')
+                        setInitialContent(draft.content || '')
+                        setCategoryIds(draft.categoryIds || [])
+                        uploadedImagesRef.current = new Set(draft.uploadedImages || [])
                     }
                 } catch (error) {
                     console.error('Failed to load draft:', error)
