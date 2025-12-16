@@ -1,0 +1,91 @@
+name: Backend Deploy to AWS EC2
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - 'backend/**'
+      - '.github/workflows/backend-deploy.yml'
+  workflow_dispatch:
+
+env:
+  AWS_REGION: ap-northeast-2
+  ECR_REPOSITORY: snuggle-express-backend # ECR 레포지토리 이름 (AWS 콘솔과 일치해야 함)
+  CONTAINER_NAME: snuggle-backend
+
+jobs:
+  deploy:
+    name: Deploy to EC2
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      # 1. AWS 자격 증명 설정 (GitHub Secrets 사용)
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      # 2. ECR 로그인
+      - name: Login to Amazon ECR
+        id: login-ecr
+        uses: aws-actions/amazon-ecr-login@v2
+
+      # 3. Docker 이미지 빌드 및 ECR 업로드
+      - name: Build, tag, and push image to Amazon ECR
+        id: build-image
+        env:
+          ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
+          IMAGE_TAG: ${{ github.sha }}
+        working-directory: ./backend
+        run: |
+          # Build
+          docker build -t $ECR_REGISTRY/$ECR_REPOSITORY:latest .
+          # Push
+          docker push $ECR_REGISTRY/$ECR_REPOSITORY:latest
+          echo "image=$ECR_REGISTRY/$ECR_REPOSITORY:latest" >> $GITHUB_OUTPUT
+
+      # 4. EC2에 SSH로 접속해서 배포 실행
+      - name: Deploy to EC2
+        uses: appleboy/ssh-action@master
+        with:
+          host: ${{ secrets.EC2_HOST }}
+          username: ${{ secrets.EC2_USER }}
+          key: ${{ secrets.EC2_SSH_KEY }}
+          script: |
+            # 1. EC2 내부에서 AWS ECR 로그인
+            aws ecr get-login-password --region ${{ env.AWS_REGION }} | docker login --username AWS --password-stdin ${{ steps.login-ecr.outputs.registry }}
+            
+            # 2. 기존 컨테이너 중지 및 삭제 (에러 무시)
+            docker stop ${{ env.CONTAINER_NAME }} || true
+            docker rm ${{ env.CONTAINER_NAME }} || true
+            
+            # 3. 최신 이미지 다운로드 (Pull)
+            docker pull ${{ steps.login-ecr.outputs.registry }}/${{ env.ECR_REPOSITORY }}:latest
+            
+            # 4. 새 컨테이너 실행
+            # -d: 백그라운드 실행
+            # -p 80:3000 -> 외부 80포트를 내부 3000포트로 연결
+            docker run -d --name ${{ env.CONTAINER_NAME }} \
+              -p 80:4000 \
+              -e NODE_ENV=production \
+              -e PORT='${{ secrets.PORT }}' \
+              -e SUPABASE_URL='${{ secrets.SUPABASE_URL }}' \
+              -e SUPABASE_ANON_KEY='${{ secrets.SUPABASE_ANON_KEY }}' \
+              -e SUPABASE_SERVICE_ROLE_KEY='${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}' \
+              -e R2_ACCOUNT_ID='${{ secrets.R2_ACCOUNT_ID }}' \
+              -e R2_ACCESS_KEY_ID='${{ secrets.R2_ACCESS_KEY_ID }}' \
+              -e R2_SECRET_ACCESS_KEY='${{ secrets.R2_SECRET_ACCESS_KEY }}' \
+              -e R2_BUCKET_NAME='${{ secrets.R2_BUCKET_NAME }}' \
+              -e R2_PUBLIC_URL='${{ secrets.R2_PUBLIC_URL }}' \
+              -e FRONTEND_URL='${{ secrets.FRONTEND_URL }}' \
+              -e REDIS_URL='${{ secrets.REDIS_URL }}' \
+              ${{ steps.login-ecr.outputs.registry }}/${{ env.ECR_REPOSITORY }}:latest
+            
+            # 5. 미사용 이미지 정리 (용량 확보)
+            docker image prune -f
