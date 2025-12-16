@@ -353,9 +353,78 @@ export async function toggleLike(postId: string): Promise<{ success: boolean; is
   return response.json()
 }
 
-// 조회수 증가
-export async function incrementViewCount(postId: string): Promise<void> {
+// 조회수 증가 (중복 방지)
+const VIEW_STORAGE_KEY = 'snuggle_viewed_posts'
+const VIEW_EXPIRY_HOURS = 24 // 24시간 후 같은 게시글 재조회 가능
+
+interface ViewedPosts {
+  [postId: string]: number // timestamp
+}
+
+function getViewedPosts(): ViewedPosts {
+  if (typeof window === 'undefined') return {}
+  try {
+    const stored = localStorage.getItem(VIEW_STORAGE_KEY)
+    return stored ? JSON.parse(stored) : {}
+  } catch {
+    return {}
+  }
+}
+
+function setViewedPost(postId: string): void {
+  if (typeof window === 'undefined') return
+  try {
+    const viewed = getViewedPosts()
+    const now = Date.now()
+
+    // 만료된 항목 정리
+    const expiryTime = VIEW_EXPIRY_HOURS * 60 * 60 * 1000
+    const cleaned: ViewedPosts = {}
+    for (const [id, timestamp] of Object.entries(viewed)) {
+      if (now - timestamp < expiryTime) {
+        cleaned[id] = timestamp
+      }
+    }
+
+    cleaned[postId] = now
+    localStorage.setItem(VIEW_STORAGE_KEY, JSON.stringify(cleaned))
+  } catch {
+    // localStorage 접근 실패 시 무시
+  }
+}
+
+function hasViewedPost(postId: string): boolean {
+  const viewed = getViewedPosts()
+  const viewedAt = viewed[postId]
+  if (!viewedAt) return false
+
+  const expiryTime = VIEW_EXPIRY_HOURS * 60 * 60 * 1000
+  return Date.now() - viewedAt < expiryTime
+}
+
+function getVisitorId(): string | null {
+  if (typeof document === 'undefined') return null
+  const match = document.cookie.match(/(^| )snuggle_visitor_id=([^;]+)/)
+  return match ? match[2] : null
+}
+
+export async function incrementViewCount(postId: string): Promise<boolean> {
+  // 이미 조회한 게시글인지 확인
+  if (hasViewedPost(postId)) {
+    return false
+  }
+
+  const visitorId = getVisitorId()
+
   await fetch(`${API_URL}/api/posts/${postId}/view`, {
     method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({ visitor_id: visitorId }),
   })
+
+  // 조회 기록 저장
+  setViewedPost(postId)
+  return true
 }
