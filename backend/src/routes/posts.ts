@@ -98,28 +98,55 @@ id, title, content, thumbnail_url, created_at, blog_id, user_id, is_private,
   }
 })
 
-// 오늘의 인기글 (최근 7일 기준 좋아요 순)
+// 오늘의 인기글 (좋아요 + 조회수 기준, 기간 자동 확장)
 router.get('/popular', async (req: Request, res: Response): Promise<void> => {
   try {
-    // 오늘의 인기글 -> 오늘 00:00:00 이후 작성된 글만
-    const today = new Date()
-    today.setHours(0, 0, 0, 0)
+    // 기간별로 시도: 오늘 → 7일 → 30일 → 전체
+    const periods = [
+      { days: 0, label: 'today' },      // 오늘
+      { days: 7, label: 'week' },       // 최근 7일
+      { days: 30, label: 'month' },     // 최근 30일
+      { days: null, label: 'all' }      // 전체
+    ]
 
-    const { data: posts, error } = await supabase
-      .from('posts')
-      .select(`
-id, title, content, thumbnail_url, created_at, blog_id, user_id, like_count,
+    let posts: any[] = []
+
+    for (const period of periods) {
+      let query = supabase
+        .from('posts')
+        .select(`
+id, title, content, thumbnail_url, created_at, blog_id, user_id, like_count, view_count,
   blog: blogs(name, thumbnail_url, user_id)
-    `)
-      .gt('created_at', today.toISOString()) // 오늘 작성된 글만
-      .gt('like_count', 0) // 좋아요 1개 이상만
-      .eq('published', true)
-      .eq('is_private', false)
-      .order('like_count', { ascending: false })
-      .limit(5)
+        `)
+        .eq('published', true)
+        .eq('is_private', false)
 
-    if (error) {
-      throw error
+      // 기간 필터 적용
+      if (period.days !== null) {
+        const fromDate = new Date()
+        fromDate.setDate(fromDate.getDate() - period.days)
+        fromDate.setHours(0, 0, 0, 0)
+        query = query.gt('created_at', fromDate.toISOString())
+      }
+
+      // 좋아요 또는 조회수가 있는 글 우선, 없으면 최신순
+      const { data, error } = await query
+        .order('like_count', { ascending: false })
+        .order('view_count', { ascending: false })
+        .order('created_at', { ascending: false })
+        .limit(5)
+
+      if (error) throw error
+
+      if (data && data.length > 0) {
+        posts = data
+        break // 글을 찾으면 종료
+      }
+    }
+
+    if (posts.length === 0) {
+      res.json([])
+      return
     }
 
     // 프로필 정보 가져오기 (작성자 프로필)
