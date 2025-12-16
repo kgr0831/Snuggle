@@ -13,9 +13,10 @@ const COMMENTS_PER_PAGE = 20
 interface CommentSectionProps {
     postId: string
     onCountChange?: (count: number) => void
+    allowComments?: boolean
 }
 
-export default function CommentSection({ postId, onCountChange }: CommentSectionProps) {
+export default function CommentSection({ postId, onCountChange, allowComments = true }: CommentSectionProps) {
     const { user, isLoading: isUserLoading } = useUserStore()
     const { selectedBlog, isLoading: isBlogLoading, hasFetched, fetchBlogs } = useBlogStore()
     const { showAlert } = useModal()
@@ -187,11 +188,22 @@ export default function CommentSection({ postId, onCountChange }: CommentSection
 
             {/* 댓글 작성 폼 */}
             <div className="mb-8">
-                <CommentForm
-                    onSubmit={handleCreateComment}
-                    loading={submitting}
-                    placeholder="댓글 추가..."
-                />
+                {allowComments ? (
+                    <CommentForm
+                        onSubmit={handleCreateComment}
+                        loading={submitting}
+                        placeholder="댓글 추가..."
+                    />
+                ) : (
+                    <div className="flex items-center gap-3 rounded-xl border border-[var(--blog-border)] bg-[var(--blog-fg)]/[0.02] px-4 py-4">
+                        <svg className="h-5 w-5 text-[var(--blog-muted)]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728A9 9 0 015.636 5.636m12.728 12.728L5.636 5.636" />
+                        </svg>
+                        <span className="text-sm text-[var(--blog-muted)]">
+                            작성자가 댓글을 허용하지 않은 글입니다.
+                        </span>
+                    </div>
+                )}
             </div>
 
             {/* 댓글 목록 */}
@@ -213,6 +225,7 @@ export default function CommentSection({ postId, onCountChange }: CommentSection
                                 onCreateReply={handleCreateReply}
                                 replyingTo={replyingTo}
                                 onCancelReply={handleCancelReply}
+                                allowComments={allowComments}
                             />
                         ))}
 

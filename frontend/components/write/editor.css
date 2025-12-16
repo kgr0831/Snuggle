@@ -230,6 +230,65 @@
     height: auto;
     border-radius: 0.5rem;
     margin: 1rem 0;
+    cursor: pointer;
+    transition: box-shadow 0.15s ease, outline 0.15s ease;
+}
+
+/* 이미지 호버 */
+.tiptap img:hover {
+    outline: 2px solid rgba(59, 130, 246, 0.3);
+    outline-offset: 2px;
+}
+
+/* 이미지 선택됨 */
+.tiptap img.ProseMirror-selectednode {
+    outline: 3px solid #3b82f6;
+    outline-offset: 2px;
+    box-shadow: 0 0 0 6px rgba(59, 130, 246, 0.15);
+}
+
+/* 드래그 중 드롭 위치 표시 */
+.tiptap .drop-cursor {
+    border-left: 2px solid #3b82f6;
+    margin-left: -1px;
+    position: relative;
+    pointer-events: none;
+}
+
+/* 이미지 업로드 플레이스홀더 */
+.image-placeholder {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    padding: 1rem;
+    margin: 1rem 0;
+    background: rgba(0, 0, 0, 0.05);
+    border: 2px dashed rgba(0, 0, 0, 0.2);
+    border-radius: 0.75rem;
+}
+
+.dark .image-placeholder {
+    background: rgba(255, 255, 255, 0.05);
+    border-color: rgba(255, 255, 255, 0.2);
+}
+
+/* 드래그 오버 시 에디터 스타일 */
+.tiptap.drag-over {
+    background: rgba(59, 130, 246, 0.05);
+}
+
+.dark .tiptap.drag-over {
+    background: rgba(59, 130, 246, 0.1);
+}
+
+/* 스핀 애니메이션 */
+@keyframes spin {
+    from {
+        transform: rotate(0deg);
+    }
+    to {
+        transform: rotate(360deg);
+    }
 }
 
 /* 링크 스타일 */

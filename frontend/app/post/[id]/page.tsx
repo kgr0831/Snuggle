@@ -269,7 +269,10 @@ export default function PostPage() {
                     />
 
                     {/* 댓글 */}
-                    <CommentSection postId={postId} />
+                    <CommentSection
+                        postId={postId}
+                        allowComments={(postData as any).is_allow_comment !== false}
+                    />
                 </main>
             </div>
         </BlogSkinProvider>

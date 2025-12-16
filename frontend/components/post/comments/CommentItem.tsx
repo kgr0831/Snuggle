@@ -16,6 +16,7 @@ interface CommentItemProps {
     replyingTo: string | null
     onCancelReply: () => void
     isReply?: boolean
+    allowComments?: boolean
 }
 
 export default function CommentItem({
@@ -27,7 +28,8 @@ export default function CommentItem({
     onCreateReply,
     replyingTo,
     onCancelReply,
-    isReply = false
+    isReply = false,
+    allowComments = true
 }: CommentItemProps) {
     const { user } = useUserStore()
     const { showAlert, showConfirm } = useModal()
@@ -253,7 +255,7 @@ export default function CommentItem({
                     )}
 
                     {/* 액션 버튼 */}
-                    {!isEditing && (
+                    {!isEditing && allowComments && (
                         <div className="mt-2 flex items-center gap-4">
                             <button
                                 onClick={handleReplyClick}
@@ -335,6 +337,7 @@ export default function CommentItem({
                                         replyingTo={replyingTo}
                                         onCancelReply={onCancelReply}
                                         isReply
+                                        allowComments={allowComments}
                                     />
                                 </div>
                             ))}

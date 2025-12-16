@@ -1,8 +1,11 @@
+import { useRef, useState } from 'react'
 import type { Editor } from '@tiptap/react'
 import ToolbarButton from './ToolbarButton'
+import { uploadTempImage } from '@/lib/api/upload'
 
 interface EditorToolbarProps {
     editor: Editor | null
+    onImageUpload?: (url: string) => void
 }
 
 // 선택 영역의 서식 상태 확인 (전체 선택이 해당 마크를 가지고 있는지)
@@ -77,7 +80,50 @@ function handleToggleCodeBlock(editor: Editor) {
     }
 }
 
-export default function EditorToolbar({ editor }: EditorToolbarProps) {
+export default function EditorToolbar({ editor, onImageUpload }: EditorToolbarProps) {
+    const fileInputRef = useRef<HTMLInputElement>(null)
+    const [isUploading, setIsUploading] = useState(false)
+
+    const handleImageClick = () => {
+        fileInputRef.current?.click()
+    }
+
+    const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+        const files = e.target.files
+        if (!files || files.length === 0 || !editor) return
+
+        setIsUploading(true)
+
+        // 현재 커서 위치 저장
+        const { from } = editor.state.selection
+        let insertOffset = 0
+
+        for (const file of Array.from(files)) {
+            if (!file.type.startsWith('image/')) continue
+
+            const url = await uploadTempImage(file)
+            if (url) {
+                // 저장된 위치 + 오프셋에 이미지 삽입
+                const insertPos = from + insertOffset
+                const { tr, schema } = editor.state
+                const imageNode = schema.nodes.image.create({ src: url })
+
+                editor.view.dispatch(tr.insert(insertPos, imageNode))
+                onImageUpload?.(url)
+
+                // 다음 이미지는 방금 삽입한 이미지 뒤에
+                insertOffset += imageNode.nodeSize
+            }
+        }
+
+        // 마지막 이미지 뒤로 커서 이동
+        editor.commands.focus()
+
+        setIsUploading(false)
+        // 같은 파일 재선택 가능하도록 초기화
+        e.target.value = ''
+    }
+
     if (!editor) return null
 
     return (
@@ -172,6 +218,26 @@ export default function EditorToolbar({ editor }: EditorToolbarProps) {
             >
                 <CodeBlockIcon />
             </ToolbarButton>
+
+            <ToolbarDivider />
+
+            {/* 이미지 */}
+            <ToolbarButton
+                onClick={handleImageClick}
+                isActive={false}
+                title="이미지 추가"
+                disabled={isUploading}
+            >
+                {isUploading ? <LoadingIcon /> : <ImageIcon />}
+            </ToolbarButton>
+            <input
+                ref={fileInputRef}
+                type="file"
+                accept="image/*"
+                multiple
+                onChange={handleFileChange}
+                className="hidden"
+            />
         </div>
     )
 }
@@ -221,6 +287,25 @@ function CodeBlockIcon() {
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
             <polyline points="16,18 22,12 16,6" />
             <polyline points="8,6 2,12 8,18" />
+        </svg>
+    )
+}
+
+function ImageIcon() {
+    return (
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+            <rect x="3" y="3" width="18" height="18" rx="2" ry="2" />
+            <circle cx="8.5" cy="8.5" r="1.5" />
+            <polyline points="21 15 16 10 5 21" />
+        </svg>
+    )
+}
+
+function LoadingIcon() {
+    return (
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="animate-spin">
+            <circle cx="12" cy="12" r="10" strokeOpacity="0.25" />
+            <path d="M12 2a10 10 0 0 1 10 10" strokeLinecap="round" />
         </svg>
     )
 }

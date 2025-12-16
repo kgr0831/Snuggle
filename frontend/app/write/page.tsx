@@ -9,6 +9,7 @@ import Link from '@tiptap/extension-link'
 import Placeholder from '@tiptap/extension-placeholder'
 import Underline from '@tiptap/extension-underline'
 import CodeBlockLowlight from '@tiptap/extension-code-block-lowlight'
+import Dropcursor from '@tiptap/extension-dropcursor'
 import { all, createLowlight } from 'lowlight'
 import { createClient } from '@/lib/supabase/client'
 import type { User } from '@supabase/supabase-js'
@@ -31,8 +32,8 @@ const lowlight = createLowlight(all)
 // temp 이미지 URL 패턴 (R2 public URL)
 const TEMP_IMAGE_PATTERN = /temp\/[^/]+\/[^"'\s]+/
 
-// HTML에서 이미지 URL 추출
-function extractImageUrls(html: string): string[] {
+// HTML에서 temp 이미지 URL 추출
+function extractTempImageUrls(html: string): string[] {
     const imgRegex = /<img[^>]+src=["']([^"']+)["']/g
     const urls: string[] = []
     let match
@@ -41,6 +42,19 @@ function extractImageUrls(html: string): string[] {
         if (TEMP_IMAGE_PATTERN.test(match[1])) {
             urls.push(match[1])
         }
+    }
+
+    return urls
+}
+
+// HTML에서 모든 이미지 URL 추출
+function extractAllImageUrls(html: string): string[] {
+    const imgRegex = /<img[^>]+src=["']([^"']+)["']/g
+    const urls: string[] = []
+    let match
+
+    while ((match = imgRegex.exec(html)) !== null) {
+        urls.push(match[1])
     }
 
     return urls
@@ -64,6 +78,20 @@ interface Category {
 
 
 
+// 파일 크기 포맷 함수
+function formatFileSize(bytes: number): string {
+    if (bytes < 1024) return bytes + ' B'
+    if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' KB'
+    return (bytes / (1024 * 1024)).toFixed(1) + ' MB'
+}
+
+// 드래그 중인 이미지 정보
+interface DragImageInfo {
+    name: string
+    size: string
+    preview: string | null
+}
+
 function WriteContent() {
     const router = useRouter()
     const searchParams = useSearchParams()
@@ -81,6 +109,12 @@ function WriteContent() {
     const [loading, setLoading] = useState(true)
     const [saving, setSaving] = useState(false)
     const [initialContent, setInitialContent] = useState('')
+
+    // 드래그 오버레이 상태
+    const [isDragging, setIsDragging] = useState(false)
+    const [dragImages, setDragImages] = useState<DragImageInfo[]>([])
+    const [uploadingImages, setUploadingImages] = useState<{ id: string; name: string; size: string }[]>([])
+    const dragCounterRef = useRef(0)
 
     // 업로드된 이미지 URL 추적
     const uploadedImagesRef = useRef<Set<string>>(new Set())
@@ -120,7 +154,7 @@ function WriteContent() {
                         setCategoryIds(catIds)
 
                         // 기존 이미지들도 추적 대상에 추가
-                        const existingImages = extractImageUrls(postData.content)
+                        const existingImages = extractTempImageUrls(postData.content)
                         existingImages.forEach(url => uploadedImagesRef.current.add(url))
                     }
                 } catch (err) {
@@ -260,6 +294,10 @@ function WriteContent() {
                     class: 'max-w-full rounded-lg',
                 },
             }),
+            Dropcursor.configure({
+                color: '#3b82f6',
+                width: 3,
+            }),
             Link.configure({
                 openOnClick: false,
                 HTMLAttributes: {
@@ -283,27 +321,53 @@ function WriteContent() {
 
                     if (imageFiles.length > 0) {
                         event.preventDefault()
+                        setIsDragging(false)
+                        setDragImages([])
 
-                        imageFiles.forEach(async (file) => {
-                            const url = await uploadTempImage(file)
-                            if (url && view.state) {
-                                // 업로드된 이미지 추적
-                                uploadedImagesRef.current.add(url)
+                        // 드롭 위치 계산
+                        const coordinates = view.posAtCoords({
+                            left: event.clientX,
+                            top: event.clientY,
+                        })
+                        const dropPos = coordinates?.pos || view.state.selection.from
 
-                                const { schema } = view.state
-                                const coordinates = view.posAtCoords({
-                                    left: event.clientX,
-                                    top: event.clientY,
-                                })
+                        // 업로드 중인 이미지 목록에 추가
+                        const uploadItems = imageFiles.map((file, index) => ({
+                            id: `upload-${Date.now()}-${index}`,
+                            name: file.name,
+                            size: formatFileSize(file.size),
+                        }))
+                        setUploadingImages(prev => [...prev, ...uploadItems])
 
-                                if (coordinates) {
-                                    const node = schema.nodes.image.create({ src: url })
-                                    const transaction = view.state.tr.insert(coordinates.pos, node)
+                        // 순차적으로 업로드하고 드롭 위치에 삽입
+                        let insertOffset = 0
+                        const uploadAndInsert = async () => {
+                            for (let i = 0; i < imageFiles.length; i++) {
+                                const file = imageFiles[i]
+                                const uploadItem = uploadItems[i]
+
+                                const url = await uploadTempImage(file)
+
+                                // 업로드 완료 - 목록에서 제거
+                                setUploadingImages(prev => prev.filter(img => img.id !== uploadItem.id))
+
+                                if (url) {
+                                    uploadedImagesRef.current.add(url)
+
+                                    // 드롭 위치 + 오프셋에 이미지 삽입
+                                    const { schema, tr } = view.state
+                                    const imageNode = schema.nodes.image.create({ src: url })
+                                    const insertPos = Math.min(dropPos + insertOffset, view.state.doc.content.size)
+                                    const transaction = tr.insert(insertPos, imageNode)
                                     view.dispatch(transaction)
+
+                                    // 다음 이미지는 방금 삽입한 이미지 뒤에
+                                    insertOffset += imageNode.nodeSize
                                 }
                             }
-                        })
+                        }
 
+                        uploadAndInsert()
                         return true
                     }
                 }
@@ -346,7 +410,7 @@ function WriteContent() {
             if (!isEditMode) {
                 // 현재 에디터의 이미지 URL 추출
                 const currentContent = editor.getHTML()
-                const currentImages = new Set(extractImageUrls(currentContent))
+                const currentImages = new Set(extractTempImageUrls(currentContent))
 
                 // 삭제된 이미지 찾기 및 R2에서 삭제
                 uploadedImagesRef.current.forEach(url => {
@@ -462,13 +526,75 @@ function WriteContent() {
         }
     }
 
+    // 페이지 레벨 드래그 핸들러
+    const handleDragEnter = useCallback((e: React.DragEvent) => {
+        e.preventDefault()
+        e.stopPropagation()
+        dragCounterRef.current++
+
+        if (e.dataTransfer?.items) {
+            const items = Array.from(e.dataTransfer.items)
+            const imageItems = items.filter(item => item.type.startsWith('image/'))
+
+            if (imageItems.length > 0) {
+                setIsDragging(true)
+
+                // 파일 정보 추출 (드래그 중에는 파일 접근 제한이 있음)
+                const files = Array.from(e.dataTransfer.files)
+                if (files.length > 0) {
+                    const imageInfos: DragImageInfo[] = files
+                        .filter(f => f.type.startsWith('image/'))
+                        .map(f => ({
+                            name: f.name,
+                            size: formatFileSize(f.size),
+                            preview: URL.createObjectURL(f)
+                        }))
+                    setDragImages(imageInfos)
+                }
+            }
+        }
+    }, [])
+
+    const handleDragLeave = useCallback((e: React.DragEvent) => {
+        e.preventDefault()
+        e.stopPropagation()
+        dragCounterRef.current--
+
+        if (dragCounterRef.current === 0) {
+            setIsDragging(false)
+            // 미리보기 URL 해제
+            dragImages.forEach(img => {
+                if (img.preview) URL.revokeObjectURL(img.preview)
+            })
+            setDragImages([])
+        }
+    }, [dragImages])
+
+    const handleDragOver = useCallback((e: React.DragEvent) => {
+        e.preventDefault()
+        e.stopPropagation()
+    }, [])
+
+    const handlePageDrop = useCallback((e: React.DragEvent) => {
+        e.preventDefault()
+        e.stopPropagation()
+        dragCounterRef.current = 0
+        // 에디터 영역에 드랍되면 에디터 handleDrop에서 처리
+    }, [])
+
     // 로딩 상태
     if (loading || isBlogLoading || !blog) {
         return <></>
     }
 
     return (
-        <div className="min-h-screen bg-white dark:bg-black">
+        <div
+            className="min-h-screen bg-white dark:bg-black"
+            onDragEnter={handleDragEnter}
+            onDragLeave={handleDragLeave}
+            onDragOver={handleDragOver}
+            onDrop={handlePageDrop}
+        >
             {/* 상단 헤더 */}
             <WriteHeader
                 onBack={() => router.back()}
@@ -498,7 +624,10 @@ function WriteContent() {
                 <div className="my-6 h-px bg-black/10 dark:bg-white/10" />
 
                 {/* 툴바 */}
-                <EditorToolbar editor={editor} />
+                <EditorToolbar
+                    editor={editor}
+                    onImageUpload={(url) => uploadedImagesRef.current.add(url)}
+                />
 
                 {/* Tiptap 에디터 */}
                 <EditorContent editor={editor} className="min-h-[500px]" />
@@ -509,13 +638,66 @@ function WriteContent() {
                 isOpen={isDrawerOpen}
                 onClose={() => setIsDrawerOpen(false)}
                 onConfirm={handleConfirmPublish}
-                // 기존 값 전달 (수정 시 유용하겠지만 현재는 기본값 사용)
                 initialValues={{
-                    isPrivate: false, // 기본값
-                    allowComments: true, // 기본값
-                    thumbnailUrl: null, // 에디터 내용 기반 자동 추출 or 기존 썸네일
+                    isPrivate: false,
+                    allowComments: true,
+                    thumbnailUrl: null,
                 }}
+                contentImages={editor ? extractAllImageUrls(editor.getHTML()) : []}
             />
+
+            {/* 드래그 오버레이 */}
+            {isDragging && (
+                <div className="pointer-events-none fixed inset-0 z-50">
+                    {/* 반투명 배경 */}
+                    <div className="absolute inset-0 bg-blue-500/10" />
+
+                    {/* 테두리 효과 */}
+                    <div className="absolute inset-4 rounded-2xl border-4 border-dashed border-blue-500/50" />
+
+                    {/* 중앙 안내 */}
+                    <div className="absolute inset-0 flex items-center justify-center">
+                        <div className="rounded-2xl bg-white/95 px-8 py-6 shadow-2xl backdrop-blur dark:bg-neutral-900/95">
+                            <div className="mb-3 flex justify-center">
+                                <div className="flex h-14 w-14 items-center justify-center rounded-full bg-blue-100 dark:bg-blue-900/30">
+                                    <svg className="h-7 w-7 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                                    </svg>
+                                </div>
+                            </div>
+                            <p className="text-center text-base font-semibold text-black dark:text-white">
+                                이미지를 놓으세요
+                            </p>
+                            {dragImages.length > 0 && (
+                                <p className="mt-1 text-center text-sm text-black/60 dark:text-white/60">
+                                    {dragImages.length}개 · {dragImages.map(d => d.size).join(', ')}
+                                </p>
+                            )}
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* 업로드 진행 상태 */}
+            {uploadingImages.length > 0 && (
+                <div className="fixed bottom-6 left-1/2 z-50 -translate-x-1/2">
+                    <div className="flex flex-col gap-2">
+                        {uploadingImages.map((img) => (
+                            <div
+                                key={img.id}
+                                className="flex items-center gap-3 rounded-full bg-black px-4 py-2.5 text-white shadow-lg dark:bg-white dark:text-black"
+                            >
+                                <svg className="h-4 w-4 animate-spin" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <circle cx="12" cy="12" r="10" strokeOpacity="0.25" strokeWidth="2" />
+                                    <path d="M12 2a10 10 0 0 1 10 10" strokeLinecap="round" strokeWidth="2" />
+                                </svg>
+                                <span className="max-w-[200px] truncate text-sm">{img.name}</span>
+                                <span className="text-xs opacity-60">{img.size}</span>
+                            </div>
+                        ))}
+                    </div>
+                </div>
+            )}
         </div>
     )
 }
