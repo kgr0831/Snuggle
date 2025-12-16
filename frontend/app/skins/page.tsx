@@ -1,10 +1,10 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { getAvailableSkins, applySkin, getBlogSkin, BlogSkin } from '@/lib/api/skins'
 import { getBlogPosts, Post } from '@/lib/api/posts'
-import Toast from '@/components/common/Toast'
+import { useToast } from '@/components/common/ToastProvider'
 import PreviewBlogLayout from '@/components/skin/PreviewBlogLayout'
 import PreviewSidebar from '@/components/skin/PreviewSidebar'
 import PreviewPostList from '@/components/skin/PreviewPostList'
@@ -33,19 +33,8 @@ export default function SkinsPage() {
   const [applying, setApplying] = useState(false)
   const [selectedSkin, setSelectedSkin] = useState<BlogSkin | null>(null)
   const [appliedSkinId, setAppliedSkinId] = useState<string | null>(null)
-  const [toast, setToast] = useState<{ message: string; type: 'success' | 'error'; visible: boolean }>({
-    message: '',
-    type: 'success',
-    visible: false,
-  })
-
-  const showToast = (message: string, type: 'success' | 'error' = 'success') => {
-    setToast({ message, type, visible: true })
-  }
-
-  const hideToast = () => {
-    setToast(prev => ({ ...prev, visible: false }))
-  }
+  const [searchQuery, setSearchQuery] = useState('')
+  const toast = useToast()
 
   useEffect(() => {
     const fetchData = async () => {
@@ -74,7 +63,6 @@ export default function SkinsPage() {
             console.error('Failed to load posts:', err)
           }
 
-          // 현재 적용된 스킨 확인
           try {
             const skinApplication = await getBlogSkin(blogData.id)
             if (skinApplication?.skin_id) {
@@ -96,7 +84,6 @@ export default function SkinsPage() {
         }
       }
 
-      // 사용 가능한 스킨 조회 (기본 + 다운로드한 스킨)
       try {
         const skinsData = await getAvailableSkins()
         setSkins(skinsData)
@@ -117,12 +104,12 @@ export default function SkinsPage() {
     if (!selectedSkin) return
 
     if (!user) {
-      showToast('로그인이 필요합니다', 'error')
+      toast.showToast('로그인이 필요합니다', 'error')
       return
     }
 
     if (!userBlog) {
-      showToast('블로그를 먼저 만들어주세요', 'error')
+      toast.showToast('블로그를 먼저 만들어주세요', 'error')
       return
     }
 
@@ -130,16 +117,30 @@ export default function SkinsPage() {
     try {
       await applySkin(userBlog.id, selectedSkin.id)
       setAppliedSkinId(selectedSkin.id)
-      showToast('스킨이 적용되었습니다!', 'success')
-    } catch (err) {
-      showToast('스킨 적용에 실패했습니다', 'error')
+      toast.showToast('스킨이 적용되었습니다')
+    } catch {
+      toast.showToast('스킨 적용에 실패했습니다', 'error')
     } finally {
       setApplying(false)
     }
   }
 
+  // 검색 필터링
+  const filteredSkins = useMemo(() => {
+    if (!searchQuery.trim()) return skins
+    const query = searchQuery.toLowerCase()
+    return skins.filter(skin =>
+      skin.name.toLowerCase().includes(query) ||
+      skin.description?.toLowerCase().includes(query)
+    )
+  }, [skins, searchQuery])
+
   if (loading) {
-    return <></>
+    return (
+      <div className="flex min-h-[calc(100vh-64px)] items-center justify-center">
+        <div className="h-6 w-6 animate-spin rounded-full border-2 border-neutral-300 border-t-neutral-900 dark:border-neutral-700 dark:border-t-white" />
+      </div>
+    )
   }
 
   const cssVars = selectedSkin?.css_variables
@@ -147,239 +148,281 @@ export default function SkinsPage() {
   const displayImage = userBlog?.thumbnail_url || profile?.profile_image_url
 
   return (
-    <div className="flex min-h-[calc(100vh-64px)] flex-col bg-zinc-100 dark:bg-zinc-950">
-      {/* 메인 - Split View */}
-      <div className="flex flex-1 overflow-hidden">
-        {/* 왼쪽: 스킨 목록 */}
-        <aside className="w-80 shrink-0 overflow-y-auto border-r border-black/10 bg-white dark:border-white/10 dark:bg-black">
-          <div className="sticky top-0 z-10 border-b border-black/5 bg-white/80 px-4 py-3 backdrop-blur dark:border-white/5 dark:bg-black/80">
-            <h2 className="text-sm font-semibold text-black dark:text-white">
-              내 스킨
-            </h2>
-            <p className="mt-0.5 text-xs text-black/50 dark:text-white/50">
-              {skins.length}개의 스킨
+    <div className="min-h-[calc(100vh-64px)] bg-neutral-50 dark:bg-neutral-950">
+      <div className="mx-auto max-w-7xl px-4 py-6 sm:px-6 lg:px-8">
+        {/* 페이지 타이틀 */}
+        <div className="mb-6 flex items-center justify-between">
+          <div>
+            <h1 className="text-xl font-semibold text-neutral-900 dark:text-white">
+              스킨 설정
+            </h1>
+            <p className="mt-0.5 text-sm text-neutral-500 dark:text-neutral-400">
+              블로그 테마를 선택하세요
             </p>
           </div>
+          {userBlog && (
+            <a
+              href={`/blog/${userBlog.id}`}
+              className="text-sm text-neutral-500 transition-colors hover:text-neutral-900 dark:text-neutral-400 dark:hover:text-white"
+            >
+              내 블로그 →
+            </a>
+          )}
+        </div>
 
-          <div className="p-3 space-y-2">
-            {skins.map((skin) => {
-              const isSelected = selectedSkin?.id === skin.id
-              const isApplied = appliedSkinId === skin.id
-              const bgColor = skin.css_variables['--blog-bg'] || '#ffffff'
-              const fgColor = skin.css_variables['--blog-fg'] || '#000000'
-              const accentColor = skin.css_variables['--blog-accent'] || '#000000'
+        {/* 로그인/블로그 안내 */}
+        {!user && (
+          <div className="mb-4 flex items-center gap-3 rounded-lg border border-amber-200 bg-amber-50 px-4 py-2.5 dark:border-amber-900/50 dark:bg-amber-950/30">
+            <svg className="h-4 w-4 shrink-0 text-amber-600 dark:text-amber-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+            </svg>
+            <p className="flex-1 text-sm text-amber-800 dark:text-amber-200">
+              스킨을 적용하려면 로그인이 필요합니다
+            </p>
+            <a href="/" className="text-sm font-medium text-amber-600 hover:underline dark:text-amber-400">
+              로그인
+            </a>
+          </div>
+        )}
 
-              return (
-                <button
-                  key={skin.id}
-                  onClick={() => setSelectedSkin(skin)}
-                  className={`w-full text-left rounded-xl border-2 transition-all ${isSelected
-                      ? 'border-black dark:border-white ring-2 ring-black/10 dark:ring-white/10'
-                      : 'border-transparent hover:border-black/20 dark:hover:border-white/20'
-                    }`}
+        {user && !userBlog && (
+          <div className="mb-4 flex items-center gap-3 rounded-lg border border-blue-200 bg-blue-50 px-4 py-2.5 dark:border-blue-900/50 dark:bg-blue-950/30">
+            <svg className="h-4 w-4 shrink-0 text-blue-600 dark:text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+            </svg>
+            <p className="flex-1 text-sm text-blue-800 dark:text-blue-200">
+              블로그를 먼저 만들어주세요
+            </p>
+            <a href="/create-blog" className="text-sm font-medium text-blue-600 hover:underline dark:text-blue-400">
+              블로그 만들기
+            </a>
+          </div>
+        )}
+
+        <div className="flex gap-5">
+          {/* 왼쪽: 스킨 목록 */}
+          <div className="w-[280px] shrink-0">
+            <div className="sticky top-20 space-y-3">
+              {/* 검색 */}
+              <div className="relative">
+                <svg className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-neutral-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                </svg>
+                <input
+                  type="text"
+                  placeholder="스킨 검색..."
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  className="w-full rounded-lg border border-neutral-200 bg-white py-2 pl-9 pr-3 text-sm text-neutral-900 placeholder-neutral-400 outline-none transition-colors focus:border-neutral-400 dark:border-neutral-800 dark:bg-neutral-900 dark:text-white dark:placeholder-neutral-500 dark:focus:border-neutral-600"
+                />
+              </div>
+
+              {/* 스킨 리스트 */}
+              <div className="overflow-hidden rounded-lg border border-neutral-200 bg-white dark:border-neutral-800 dark:bg-neutral-900">
+                <div className="max-h-[calc(100vh-280px)] overflow-y-auto">
+                  {filteredSkins.length === 0 ? (
+                    <div className="px-4 py-8 text-center text-sm text-neutral-500 dark:text-neutral-400">
+                      {searchQuery ? '검색 결과가 없습니다' : '스킨이 없습니다'}
+                    </div>
+                  ) : (
+                    <div className="divide-y divide-neutral-100 dark:divide-neutral-800">
+                      {filteredSkins.map((skin) => {
+                        const isSelected = selectedSkin?.id === skin.id
+                        const isApplied = appliedSkinId === skin.id
+                        const bgColor = skin.css_variables['--blog-bg'] || '#ffffff'
+                        const fgColor = skin.css_variables['--blog-fg'] || '#000000'
+                        const accentColor = skin.css_variables['--blog-accent'] || '#3b82f6'
+
+                        return (
+                          <button
+                            key={skin.id}
+                            onClick={() => setSelectedSkin(skin)}
+                            className={`flex w-full items-center gap-3 px-3 py-2.5 text-left transition-colors ${
+                              isSelected
+                                ? 'bg-neutral-100 dark:bg-neutral-800'
+                                : 'hover:bg-neutral-50 dark:hover:bg-neutral-800/50'
+                            }`}
+                          >
+                            {/* 컬러 스와치 */}
+                            <div
+                              className="relative h-10 w-10 shrink-0 overflow-hidden rounded-md border border-neutral-200 dark:border-neutral-700"
+                              style={{ backgroundColor: bgColor }}
+                            >
+                              <div className="absolute bottom-1 left-1 flex gap-0.5">
+                                <div
+                                  className="h-1.5 w-3 rounded-sm"
+                                  style={{ backgroundColor: fgColor, opacity: 0.7 }}
+                                />
+                                <div
+                                  className="h-1.5 w-1.5 rounded-sm"
+                                  style={{ backgroundColor: accentColor }}
+                                />
+                              </div>
+                            </div>
+
+                            {/* 스킨 정보 */}
+                            <div className="min-w-0 flex-1">
+                              <div className="flex items-center gap-1.5">
+                                <span className="truncate text-sm font-medium text-neutral-900 dark:text-white">
+                                  {skin.name}
+                                </span>
+                                {isApplied && (
+                                  <span className="shrink-0 rounded bg-neutral-900 px-1.5 py-0.5 text-[10px] font-medium text-white dark:bg-white dark:text-neutral-900">
+                                    적용중
+                                  </span>
+                                )}
+                              </div>
+                              {skin.description && (
+                                <p className="truncate text-xs text-neutral-500 dark:text-neutral-400">
+                                  {skin.description}
+                                </p>
+                              )}
+                            </div>
+
+                            {/* 선택 표시 */}
+                            {isSelected && (
+                              <svg className="h-4 w-4 shrink-0 text-neutral-900 dark:text-white" fill="currentColor" viewBox="0 0 20 20">
+                                <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                              </svg>
+                            )}
+                          </button>
+                        )
+                      })}
+                    </div>
+                  )}
+                </div>
+
+                {/* 마켓플레이스 링크 */}
+                <a
+                  href="/marketplace"
+                  className="flex items-center gap-3 border-t border-neutral-100 px-3 py-2.5 text-sm text-neutral-500 transition-colors hover:bg-neutral-50 hover:text-neutral-900 dark:border-neutral-800 dark:text-neutral-400 dark:hover:bg-neutral-800/50 dark:hover:text-white"
                 >
-                  {/* 컬러 프리뷰 */}
-                  <div
-                    className="relative h-20 rounded-t-lg p-3"
-                    style={{ backgroundColor: bgColor }}
-                  >
-                    {/* 적용됨 뱃지 */}
-                    {isApplied && (
-                      <div className="absolute right-2 top-2 rounded-full bg-black/80 px-2 py-0.5 text-[10px] font-medium text-white">
-                        적용됨
-                      </div>
-                    )}
-                    <div className="flex h-full flex-col justify-between">
-                      <div className="flex items-center gap-2">
-                        <div
-                          className="h-2 w-10 rounded-full"
-                          style={{ backgroundColor: fgColor }}
-                        />
-                        <div
-                          className="h-2 w-2 rounded-full"
-                          style={{ backgroundColor: accentColor }}
-                        />
-                      </div>
-                      <div className="space-y-1">
-                        <div
-                          className="h-1.5 w-16 rounded-full"
-                          style={{ backgroundColor: fgColor, opacity: 0.5 }}
-                        />
-                        <div
-                          className="h-1.5 w-12 rounded-full"
-                          style={{ backgroundColor: fgColor, opacity: 0.3 }}
-                        />
-                      </div>
-                    </div>
+                  <div className="flex h-10 w-10 items-center justify-center rounded-md border border-dashed border-neutral-300 dark:border-neutral-700">
+                    <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 4v16m8-8H4" />
+                    </svg>
                   </div>
+                  <span>더 많은 스킨 찾기</span>
+                </a>
+              </div>
+            </div>
+          </div>
 
-                  {/* 스킨 정보 */}
-                  <div className="rounded-b-lg bg-zinc-50 px-3 py-2.5 dark:bg-zinc-900">
-                    <div className="flex items-center justify-between">
-                      <span className="text-sm font-medium text-black dark:text-white">
-                        {skin.name}
-                      </span>
-                      {isSelected && (
-                        <div className="flex h-5 w-5 items-center justify-center rounded-full bg-black dark:bg-white">
-                          <svg className="h-3 w-3 text-white dark:text-black" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" />
-                          </svg>
-                        </div>
-                      )}
-                    </div>
-                    {skin.description && (
-                      <p className="mt-0.5 text-xs text-black/50 dark:text-white/50 line-clamp-1">
-                        {skin.description}
+          {/* 오른쪽: 미리보기 */}
+          <div className="flex-1 min-w-0">
+            {selectedSkin && cssVars ? (
+              <div className="space-y-4">
+                {/* 미리보기 헤더 */}
+                <div className="flex items-center justify-between">
+                  <div>
+                    <h2 className="text-lg font-medium text-neutral-900 dark:text-white">
+                      {selectedSkin.name}
+                    </h2>
+                    {selectedSkin.description && (
+                      <p className="text-sm text-neutral-500 dark:text-neutral-400">
+                        {selectedSkin.description}
                       </p>
                     )}
                   </div>
-                </button>
-              )
-            })}
-          </div>
-
-          {/* 마켓플레이스 안내 */}
-          <div className="mx-3 mb-3 rounded-xl bg-zinc-100 p-4 dark:bg-zinc-900">
-            <p className="text-sm text-black/70 dark:text-white/70">
-              더 많은 스킨을 찾고 있나요?
-            </p>
-            <a
-              href="/marketplace"
-              className="mt-2 inline-block text-sm font-medium text-black hover:underline dark:text-white"
-            >
-              마켓플레이스 방문하기 →
-            </a>
-          </div>
-
-          {/* 로그인/블로그 안내 */}
-          {!user && (
-            <div className="mx-3 mb-3 rounded-xl bg-amber-50 p-4 dark:bg-amber-950/30">
-              <p className="text-sm text-amber-800 dark:text-amber-200">
-                스킨을 적용하려면 로그인이 필요합니다
-              </p>
-              <a
-                href="/"
-                className="mt-2 inline-block text-sm font-medium text-amber-600 hover:underline dark:text-amber-400"
-              >
-                로그인하기 →
-              </a>
-            </div>
-          )}
-
-          {user && !userBlog && (
-            <div className="mx-3 mb-3 rounded-xl bg-blue-50 p-4 dark:bg-blue-950/30">
-              <p className="text-sm text-blue-800 dark:text-blue-200">
-                블로그를 먼저 만들어주세요
-              </p>
-              <a
-                href="/create-blog"
-                className="mt-2 inline-block text-sm font-medium text-blue-600 hover:underline dark:text-blue-400"
-              >
-                블로그 만들기 →
-              </a>
-            </div>
-          )}
-        </aside>
-
-        {/* 오른쪽: 미리보기 */}
-        <main className="flex-1 overflow-y-auto">
-          {selectedSkin && cssVars ? (
-            <div className="h-full flex flex-col">
-              {/* 미리보기 컨트롤 바 */}
-              <div className="shrink-0 flex items-center justify-between border-b border-black/10 bg-white px-6 py-3 dark:border-white/10 dark:bg-black">
-                <div>
-                  <h1 className="text-lg font-bold text-black dark:text-white">
-                    {selectedSkin.name}
-                  </h1>
-                  <p className="text-sm text-black/50 dark:text-white/50">
-                    {selectedSkin.description || '미리보기'}
-                  </p>
+                  {appliedSkinId === selectedSkin.id ? (
+                    <span className="inline-flex items-center gap-1.5 rounded-lg bg-neutral-100 px-3 py-1.5 text-sm text-neutral-500 dark:bg-neutral-800 dark:text-neutral-400">
+                      <svg className="h-3.5 w-3.5" fill="currentColor" viewBox="0 0 20 20">
+                        <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                      </svg>
+                      적용됨
+                    </span>
+                  ) : (
+                    <button
+                      onClick={handleApplySkin}
+                      disabled={applying || !user || !userBlog}
+                      className="rounded-lg bg-neutral-900 px-4 py-1.5 text-sm font-medium text-white transition-colors hover:bg-neutral-800 disabled:cursor-not-allowed disabled:opacity-50 dark:bg-white dark:text-neutral-900 dark:hover:bg-neutral-100"
+                    >
+                      {applying ? '적용 중...' : '적용하기'}
+                    </button>
+                  )}
                 </div>
-                {appliedSkinId === selectedSkin.id ? (
-                  <span className="rounded-lg bg-black/10 px-5 py-2 text-sm font-medium text-black/50 dark:bg-white/10 dark:text-white/50">
-                    적용됨
-                  </span>
-                ) : (
-                  <button
-                    onClick={handleApplySkin}
-                    disabled={applying || !user || !userBlog}
-                    className="rounded-lg bg-black px-5 py-2 text-sm font-medium text-white transition-colors hover:bg-black/80 disabled:cursor-not-allowed disabled:opacity-50 dark:bg-white dark:text-black dark:hover:bg-white/80"
-                  >
-                    {applying ? '적용 중...' : '이 스킨 적용하기'}
-                  </button>
-                )}
-              </div>
 
-              {/* 미리보기 영역 */}
-              <div
-                className="flex-1 overflow-y-auto flex flex-col"
-                style={{
-                  backgroundColor: cssVars['--blog-bg'],
-                  color: cssVars['--blog-fg'],
-                  fontFamily: cssVars['--blog-font-sans'],
-                }}
-              >
-                {/* 블로그 헤더 */}
-                <header
-                  className="shrink-0 border-b px-6 py-4"
-                  style={{ borderColor: cssVars['--blog-border'] }}
-                >
-                  <div className="flex items-center justify-between">
-                    <span className="text-lg font-bold">Snuggle</span>
-                    <div className="flex items-center gap-3">
-                      <span
-                        className="text-sm"
-                        style={{ color: cssVars['--blog-muted'] }}
-                      >
-                        홈
-                      </span>
-                      <button
-                        className="rounded-lg px-3 py-1.5 text-sm font-medium"
-                        style={{
-                          backgroundColor: cssVars['--blog-accent'],
-                          color: cssVars['--blog-bg'],
-                        }}
-                      >
-                        새 글 작성
-                      </button>
+                {/* 미리보기 프레임 */}
+                <div className="overflow-hidden rounded-xl border border-neutral-200 bg-white shadow-sm dark:border-neutral-800 dark:bg-neutral-900">
+                  {/* 브라우저 바 */}
+                  <div className="flex h-9 items-center gap-2 border-b border-neutral-200 bg-neutral-100 px-3 dark:border-neutral-800 dark:bg-neutral-800">
+                    <div className="flex gap-1.5">
+                      <div className="h-2.5 w-2.5 rounded-full bg-neutral-300 dark:bg-neutral-600" />
+                      <div className="h-2.5 w-2.5 rounded-full bg-neutral-300 dark:bg-neutral-600" />
+                      <div className="h-2.5 w-2.5 rounded-full bg-neutral-300 dark:bg-neutral-600" />
+                    </div>
+                    <div className="flex-1">
+                      <div className="mx-auto max-w-xs rounded bg-white px-3 py-0.5 text-center text-xs text-neutral-400 dark:bg-neutral-900">
+                        {userBlog ? `snuggle.com/blog/${userBlog.id}` : 'snuggle.com/blog'}
+                      </div>
                     </div>
                   </div>
-                </header>
 
-                {/* 블로그 본문 - 레이아웃 컴포넌트 사용 */}
-                <PreviewBlogLayout
-                  layout={layout}
-                  cssVars={cssVars}
-                  sidebar={
-                    <PreviewSidebar
+                  {/* 미리보기 콘텐츠 */}
+                  <div
+                    className="flex h-[600px] flex-col overflow-hidden"
+                    style={{
+                      backgroundColor: cssVars['--blog-bg'],
+                      color: cssVars['--blog-fg'],
+                      fontFamily: cssVars['--blog-font-sans'],
+                    }}
+                  >
+                    {/* 블로그 헤더 */}
+                    <header
+                      className="shrink-0 border-b px-5 py-3"
+                      style={{ borderColor: cssVars['--blog-border'] }}
+                    >
+                      <div className="flex items-center justify-between">
+                        <span className="font-semibold">{userBlog?.name || '내 블로그'}</span>
+                        <div className="flex items-center gap-2">
+                          <span
+                            className="text-sm"
+                            style={{ color: cssVars['--blog-muted'] }}
+                          >
+                            홈
+                          </span>
+                          <button
+                            className="rounded-md px-2.5 py-1 text-sm font-medium"
+                            style={{
+                              backgroundColor: cssVars['--blog-accent'],
+                              color: cssVars['--blog-bg'],
+                            }}
+                          >
+                            글쓰기
+                          </button>
+                        </div>
+                      </div>
+                    </header>
+
+                    {/* 블로그 본문 */}
+                    <PreviewBlogLayout
+                      layout={layout}
                       cssVars={cssVars}
-                      blogName={userBlog?.name}
-                      blogDescription={userBlog?.description}
-                      displayImage={displayImage}
-                      postCount={blogPosts.length}
-                    />
-                  }
-                >
-                  <PreviewPostList cssVars={cssVars} posts={blogPosts} />
-                </PreviewBlogLayout>
+                      sidebar={
+                        <PreviewSidebar
+                          cssVars={cssVars}
+                          blogName={userBlog?.name}
+                          blogDescription={userBlog?.description}
+                          displayImage={displayImage}
+                          postCount={blogPosts.length}
+                        />
+                      }
+                    >
+                      <PreviewPostList cssVars={cssVars} posts={blogPosts} />
+                    </PreviewBlogLayout>
+                  </div>
+                </div>
               </div>
-            </div>
-          ) : (
-            <div className="flex h-full items-center justify-center">
-              <p className="text-black/50 dark:text-white/50">
-                스킨을 선택해주세요
-              </p>
-            </div>
-          )}
-        </main>
+            ) : (
+              <div className="flex h-[600px] items-center justify-center rounded-xl border border-neutral-200 bg-white dark:border-neutral-800 dark:bg-neutral-900">
+                <p className="text-neutral-500 dark:text-neutral-400">
+                  스킨을 선택해주세요
+                </p>
+              </div>
+            )}
+          </div>
+        </div>
       </div>
-
-      <Toast
-        message={toast.message}
-        type={toast.type}
-        isVisible={toast.visible}
-        onClose={hideToast}
-      />
     </div>
   )
 }
