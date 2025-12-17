@@ -1,5 +1,8 @@
 'use client'
 
+export const runtime = 'edge'
+export const dynamic = 'force-dynamic'
+
 import { useEffect, useState, useRef } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import { getPost, incrementViewCount, PostWithDetails } from '@/lib/api/posts'
