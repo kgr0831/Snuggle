@@ -94,6 +94,7 @@ function sanitizeHTML(html: string): string {
     ALLOWED_TAGS,
     ALLOWED_ATTR,
     ALLOW_DATA_ATTR: true,
+    ADD_ATTR: ['style', 'target'], // 명시적 추가
   })
 }
 
@@ -247,65 +248,13 @@ export default function CustomBlogRenderer({
     return (
       <div
         className="custom-skin-wrapper min-h-screen"
-        style={{
-          backgroundColor: 'var(--blog-bg, #ffffff)',
-          color: 'var(--blog-fg, #000000)',
-        }}
+      // Unified Mode에서는 인라인 스타일 제거 (CSS가 제어하도록)
       >
         {/* CSS Grid 레이아웃 + 커스텀 CSS */}
-        <style>{`
-          .custom-skin-unified {
-            display: grid;
-            grid-template-columns: 1fr 320px;
-            grid-template-rows: auto 1fr auto;
-            grid-template-areas:
-              "header header"
-              "content sidebar"
-              "footer footer";
-            gap: 0 2rem;
-            max-width: 1280px;
-            margin: 0 auto;
-            min-height: 100vh;
-          }
-          .custom-skin-unified .blog-header {
-            grid-area: header;
-            max-width: none;
-            width: 100%;
-          }
-          .custom-skin-unified .blog-sidebar {
-            grid-area: sidebar;
-            width: 100%;
-            padding-top: 2.5rem;
-          }
-          .custom-skin-unified .blog-footer {
-            grid-area: footer;
-          }
-          .custom-skin-unified .post-list,
-          .custom-skin-unified .post-detail {
-            grid-area: content;
-            padding: 2.5rem 1.5rem;
-          }
-          /* blog-main-layout이 있는 경우 flex 레이아웃 */
-          .custom-skin-unified .blog-main-layout {
-            grid-column: 1 / -1;
-            grid-row: 2;
-            display: flex;
-            flex-direction: row;
-            gap: 2rem;
-            padding: 2.5rem 1.5rem;
-          }
-          .custom-skin-unified .blog-main-layout .blog-content-area {
-            flex: 1;
-            min-width: 0;
-          }
-          .custom-skin-unified .blog-main-layout .blog-sidebar {
-            width: 320px;
-            flex-shrink: 0;
-            padding-top: 0;
-          }
-          ${renderedContent.customCss}
-        `}</style>
-        <div className="custom-skin-unified" dangerouslySetInnerHTML={{ __html: renderedContent.fullHtml || '' }} />
+        <div className="custom-skin-unified">
+          <style>{renderedContent.customCss}</style>
+          <div dangerouslySetInnerHTML={{ __html: renderedContent.fullHtml || '' }} />
+        </div>
         {isOwner && (
           <div className="fixed bottom-6 right-6 z-50">
             <a href="/write" className="flex h-12 w-12 items-center justify-center rounded-full bg-black text-white shadow-lg transition-transform hover:scale-110 dark:bg-white dark:text-black">

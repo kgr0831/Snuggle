@@ -14,8 +14,49 @@ import {
   CustomSkinUpdateData,
   TEMPLATE_VARIABLES,
 } from '@/lib/api/skins'
+import { renderTemplate } from '@/lib/utils/templateRenderer'
 import AIChatPanel from '@/components/skin/AIChatPanel'
+import FramePreview from '@/components/skin/FramePreview'
 import type { User } from '@supabase/supabase-js'
+
+const MOCK_DATA = {
+  blog_name: 'Snuggle Blog',
+  blog_description: '개발자의 일상과 코딩 이야기',
+  profile_image: 'https://api.dicebear.com/7.x/avataaars/svg?seed=Felix',
+  post_count: 12,
+  visitor_count: 1234,
+  posts: [
+    {
+      post_id: '1',
+      post_title: '안녕하세요! 첫 번째 글입니다.',
+      post_excerpt: '블로그를 개설했습니다. 앞으로 좋은 글 많이 쓸게요!',
+      post_date: '2025.12.18',
+      thumbnail_url: 'https://picsum.photos/seed/1/800/400',
+      view_count: 42,
+      like_count: 10,
+      blog_id: 'mock-blog',
+    },
+    {
+      post_id: '2',
+      post_title: 'React와 Next.js로 블로그 만들기',
+      post_excerpt: 'Next.js 14 App Router를 사용하여 블로그를 구축하는 방법을 알아봅시다.',
+      post_date: '2025.12.17',
+      thumbnail_url: 'https://picsum.photos/seed/2/800/400',
+      view_count: 128,
+      like_count: 25,
+      blog_id: 'mock-blog',
+    },
+    {
+      post_id: '3',
+      post_title: '오늘의 코딩 꿀팁',
+      post_excerpt: '유용한 VS Code 단축키 모음집',
+      post_date: '2025.12.16',
+      view_count: 56,
+      like_count: 5,
+      blog_id: 'mock-blog',
+    }
+  ]
+}
 
 // 기본 HTML 템플릿
 function getDefaultHTMLTemplate(): string {
@@ -321,12 +362,40 @@ export default function CustomSkinEditorPage() {
 
   // AI 생성 디자인 자동 적용 (HTML + CSS)
   const handleApplyDesign = useCallback((sections: Record<string, string>) => {
+    // LLM 아티팩트 제거 및 정제
+    const sanitize = (str: string) => str.replace(/<｜begin▁of▁sentence｜>/g, '').trim()
+
+    setEditedData(prev => {
+      const next = { ...prev }
+
+      // Unified Template 처리
+      if (sections.html_template) {
+        const cleanHtml = sanitize(sections.html_template)
+        // Preview와 Editor가 Unified Mode를 인식하도록 html_template 저장
+        next.html_template = cleanHtml
+
+        // 중요: Preview 렌더링을 위해 html_header에 매핑하고 나머지는 비움
+        // 통합 모드로 전환하기 위해 개별 섹션들을 모두 비웁니다.
+        next.html_header = cleanHtml
+        next.html_post_list = ''
+        next.html_sidebar = ''
+        next.html_footer = ''
+      }
+
+      if (sections.custom_css) {
+        next.custom_css = sanitize(sections.custom_css)
+      }
+
+      return next
+    })
+
+    // 템플릿 탭으로 이동
     if (sections.html_template) {
-      setEditedData(prev => ({ ...prev, html_template: sections.html_template }))
+      setActiveSection('html_template') // 에디터 탭 전환
+    } else if (sections.custom_css) {
+      setActiveSection('custom_css')
     }
-    if (sections.custom_css) {
-      setEditedData(prev => ({ ...prev, custom_css: sections.custom_css }))
-    }
+
     setHasChanges(true)
     toast.showToast('디자인이 적용되었습니다')
   }, [toast])
@@ -458,11 +527,10 @@ export default function CustomSkinEditorPage() {
           {/* 활성화 토글 */}
           <button
             onClick={handleToggle}
-            className={`flex items-center gap-2 rounded-lg px-3 py-1.5 text-sm font-medium transition-colors ${
-              editedData.is_active
-                ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400'
-                : 'bg-neutral-100 text-neutral-600 dark:bg-neutral-800 dark:text-neutral-400'
-            }`}
+            className={`flex items-center gap-2 rounded-lg px-3 py-1.5 text-sm font-medium transition-colors ${editedData.is_active
+              ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400'
+              : 'bg-neutral-100 text-neutral-600 dark:bg-neutral-800 dark:text-neutral-400'
+              }`}
           >
             <div className={`h-2 w-2 rounded-full ${editedData.is_active ? 'bg-emerald-500' : 'bg-neutral-400'}`} />
             {editedData.is_active ? '활성화됨' : '비활성화'}
@@ -499,11 +567,10 @@ export default function CustomSkinEditorPage() {
                 <button
                   key={section.key}
                   onClick={() => setActiveSection(section.key)}
-                  className={`flex w-full items-center gap-2.5 rounded-lg px-3 py-2 text-left transition-colors ${
-                    activeSection === section.key
-                      ? 'bg-neutral-100 text-neutral-900 dark:bg-neutral-800 dark:text-white'
-                      : 'text-neutral-600 hover:bg-neutral-50 dark:text-neutral-400 dark:hover:bg-neutral-800/50'
-                  }`}
+                  className={`flex w-full items-center gap-2.5 rounded-lg px-3 py-2 text-left transition-colors ${activeSection === section.key
+                    ? 'bg-neutral-100 text-neutral-900 dark:bg-neutral-800 dark:text-white'
+                    : 'text-neutral-600 hover:bg-neutral-50 dark:text-neutral-400 dark:hover:bg-neutral-800/50'
+                    }`}
                 >
                   <span className="text-base">{section.icon}</span>
                   <div className="min-w-0 flex-1">
@@ -534,36 +601,52 @@ export default function CustomSkinEditorPage() {
           </div>
         </div>
 
-        {/* 메인 에디터 영역 */}
-        <div className="flex flex-1 flex-col overflow-hidden">
-          {/* 에디터 헤더 */}
-          <div className="flex shrink-0 items-center justify-between border-b border-neutral-200 bg-neutral-100 px-4 py-2 dark:border-neutral-800 dark:bg-neutral-800">
-            <div className="flex items-center gap-2">
-              <span className="text-lg">{TEMPLATE_SECTIONS.find(s => s.key === activeSection)?.icon}</span>
-              <span className="text-sm font-medium text-neutral-900 dark:text-white">
-                {TEMPLATE_SECTIONS.find(s => s.key === activeSection)?.label}
-              </span>
-              <span className="rounded bg-neutral-200 px-1.5 py-0.5 text-xs text-neutral-500 dark:bg-neutral-700 dark:text-neutral-400">
-                {isCSS ? 'CSS' : 'HTML'}
-              </span>
+        {/* 중앙: 에디터 + 프리뷰 (Split View) */}
+        <div className="flex flex-1 overflow-hidden">
+          {/* 에디터 (왼쪽 or 상단) */}
+          <div className="flex flex-1 flex-col border-r border-neutral-200 dark:border-neutral-800">
+            {/* 에디터 헤더 */}
+            <div className="flex shrink-0 items-center justify-between border-b border-neutral-200 bg-neutral-100 px-4 py-2 dark:border-neutral-800 dark:bg-neutral-800">
+              <div className="flex items-center gap-2">
+                <span className="text-lg">{TEMPLATE_SECTIONS.find(s => s.key === activeSection)?.icon}</span>
+                <span className="text-sm font-medium text-neutral-900 dark:text-white">
+                  {TEMPLATE_SECTIONS.find(s => s.key === activeSection)?.label}
+                </span>
+                <span className="rounded bg-neutral-200 px-1.5 py-0.5 text-xs text-neutral-500 dark:bg-neutral-700 dark:text-neutral-400">
+                  {isCSS ? 'CSS' : 'HTML'}
+                </span>
+              </div>
+              <button
+                onClick={() => handleLoadDefault(activeSection)}
+                className="text-xs text-neutral-500 transition-colors hover:text-neutral-900 dark:text-neutral-400 dark:hover:text-white"
+              >
+                기본 템플릿 불러오기
+              </button>
             </div>
-            <button
-              onClick={() => handleLoadDefault(activeSection)}
-              className="text-xs text-neutral-500 transition-colors hover:text-neutral-900 dark:text-neutral-400 dark:hover:text-white"
-            >
-              기본 템플릿 불러오기
-            </button>
+
+            {/* 코드 에디터 */}
+            <div className="flex-1 overflow-hidden">
+              <textarea
+                value={currentValue}
+                onChange={(e) => handleEditorChange(activeSection, e.target.value)}
+                className="h-full w-full resize-none border-0 bg-neutral-900 p-4 font-mono text-sm leading-relaxed text-neutral-100 outline-none"
+                placeholder={isCSS ? '/* CSS 코드를 입력하세요 */' : '<!-- HTML 코드를 입력하세요 -->'}
+                spellCheck={false}
+              />
+            </div>
           </div>
 
-          {/* 코드 에디터 */}
-          <div className="flex-1 overflow-hidden">
-            <textarea
-              value={currentValue}
-              onChange={(e) => handleEditorChange(activeSection, e.target.value)}
-              className="h-full w-full resize-none border-0 bg-neutral-900 p-4 font-mono text-sm leading-relaxed text-neutral-100 outline-none"
-              placeholder={isCSS ? '/* CSS 코드를 입력하세요 */' : '<!-- HTML 코드를 입력하세요 -->'}
-              spellCheck={false}
-            />
+          {/* 프리뷰 (오른쪽) - FramePreview 사용 */}
+          <div className="hidden w-1/2 flex-col bg-neutral-100 dark:bg-black lg:flex">
+            <div className="flex shrink-0 items-center justify-between border-b border-neutral-200 bg-neutral-100 px-4 py-2 dark:border-neutral-800 dark:bg-neutral-800">
+              <span className="text-sm font-medium text-neutral-600 dark:text-neutral-400">Preview</span>
+            </div>
+            <div className="flex-1 p-4">
+              <FramePreview
+                html={renderTemplate(editedData.html_template || '', MOCK_DATA)}
+                css={editedData.custom_css || ''}
+              />
+            </div>
           </div>
         </div>
 

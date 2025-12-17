@@ -421,10 +421,22 @@ export async function saveCustomSkin(
 
   if (existing) {
     // 업데이트
+    // html_template가 있으면 Unified Mode로 처리
+    const updateData = { ...data }
+    if (updateData.html_template) {
+      updateData.html_header = updateData.html_template
+      // Unified Mode 감지를 위해 다른 섹션 비우기
+      updateData.html_post_list = ''
+      updateData.html_sidebar = ''
+      updateData.html_footer = ''
+      // DB에 없는 필드 제거
+      delete updateData.html_template
+    }
+
     const { data: updated, error: updateError } = await supabase
       .from('blog_custom_skins')
       .update({
-        ...data,
+        ...updateData,
         updated_at: new Date().toISOString(),
       })
       .eq('blog_id', blogId)
@@ -439,17 +451,21 @@ export async function saveCustomSkin(
   } else {
     // 새로 생성
     const defaults = getDefaultTemplates()
+    const isUnified = !!data.html_template
+
     const { data: created, error: createError } = await supabase
       .from('blog_custom_skins')
       .insert({
         blog_id: blogId,
         html_head: data.html_head ?? defaults.html_head,
-        html_header: data.html_header ?? defaults.html_header,
-        html_post_list: data.html_post_list ?? defaults.html_post_list,
-        html_post_item: data.html_post_item ?? defaults.html_post_item,
+        // Unified Mode면 html_template 사용, 아니면 html_header
+        html_header: isUnified ? data.html_template : (data.html_header ?? defaults.html_header),
+        // Unified Mode면 빈 문자열, 아니면 기존 로직
+        html_post_list: isUnified ? '' : (data.html_post_list ?? defaults.html_post_list),
+        html_post_item: data.html_post_item ?? defaults.html_post_item, // post_item은 partials로 쓰일 수 있음
         html_post_detail: data.html_post_detail ?? defaults.html_post_detail,
-        html_sidebar: data.html_sidebar ?? defaults.html_sidebar,
-        html_footer: data.html_footer ?? defaults.html_footer,
+        html_sidebar: isUnified ? '' : (data.html_sidebar ?? defaults.html_sidebar),
+        html_footer: isUnified ? '' : (data.html_footer ?? defaults.html_footer),
         custom_css: data.custom_css ?? defaults.custom_css,
         is_active: data.is_active ?? false,
         use_default_header: data.use_default_header ?? true,
