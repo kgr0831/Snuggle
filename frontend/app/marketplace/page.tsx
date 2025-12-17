@@ -24,6 +24,7 @@ import {
 import { getVisitorCount } from '@/lib/api/blogs'
 import { renderTemplate, TemplateContext } from '@/lib/utils/templateRenderer'
 import Toast from '@/components/common/Toast'
+import AIChatPanel from '@/components/skin/AIChatPanel'
 import type { User } from '@supabase/supabase-js'
 
 // Monaco Editor 동적 로드 (SSR 비활성화)
@@ -143,6 +144,7 @@ export default function MarketplacePage() {
   const [hasChanges, setHasChanges] = useState(false)
   const [saving, setSaving] = useState(false)
   const [showVariables, setShowVariables] = useState(false)
+  const [showAIChat, setShowAIChat] = useState(false)
 
   const [toast, setToast] = useState<{ message: string; type: 'success' | 'error'; visible: boolean }>({
     message: '',
@@ -394,6 +396,12 @@ export default function MarketplacePage() {
     setEditedData(prev => ({ ...prev, [key]: value }))
     setHasChanges(true)
   }, [])
+
+  // AI 생성 코드 삽입
+  const handleInsertCode = useCallback((code: string) => {
+    handleEditorChange(activeSection, code)
+    showToast('코드가 에디터에 삽입되었습니다')
+  }, [activeSection, handleEditorChange])
 
   // 저장
   const handleSave = async () => {
@@ -801,6 +809,19 @@ export default function MarketplacePage() {
                 </div>
                 <div className="flex items-center gap-2">
                   <button
+                    onClick={() => setShowAIChat(!showAIChat)}
+                    className={`flex items-center gap-1.5 rounded px-2 py-1 text-xs font-medium transition-colors ${
+                      showAIChat
+                        ? 'bg-gradient-to-r from-blue-600 to-purple-600 text-white'
+                        : 'text-neutral-400 hover:bg-neutral-700'
+                    }`}
+                  >
+                    <svg className="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
+                    </svg>
+                    AI 어시스턴트
+                  </button>
+                  <button
                     onClick={() => setShowVariables(!showVariables)}
                     className={`rounded px-2 py-1 text-xs transition-colors ${
                       showVariables
@@ -841,29 +862,46 @@ export default function MarketplacePage() {
                 </div>
               )}
 
-              {/* Monaco 에디터 */}
-              <div className="flex-1">
-                <MonacoEditor
-                  height="100%"
-                  language={isCSS ? 'css' : 'html'}
-                  value={currentValue}
-                  onChange={(value) => handleEditorChange(activeSection, value || '')}
-                  theme="vs-dark"
-                  options={{
-                    fontSize: 14,
-                    fontFamily: "'JetBrains Mono', 'Fira Code', Consolas, monospace",
-                    minimap: { enabled: false },
-                    lineNumbers: 'on',
-                    wordWrap: 'on',
-                    scrollBeyondLastLine: false,
-                    automaticLayout: true,
-                    tabSize: 2,
-                    padding: { top: 16 },
-                    renderLineHighlight: 'line',
-                    cursorBlinking: 'smooth',
-                    smoothScrolling: true,
-                  }}
-                />
+              {/* Monaco 에디터 + AI 패널 컨테이너 */}
+              <div className="flex flex-1 overflow-hidden">
+                {/* Monaco 에디터 */}
+                <div className={`${showAIChat ? 'w-1/2' : 'w-full'} transition-all duration-300`}>
+                  <MonacoEditor
+                    height="100%"
+                    language={isCSS ? 'css' : 'html'}
+                    value={currentValue}
+                    onChange={(value) => handleEditorChange(activeSection, value || '')}
+                    theme="vs-dark"
+                    options={{
+                      fontSize: 14,
+                      fontFamily: "'JetBrains Mono', 'Fira Code', Consolas, monospace",
+                      minimap: { enabled: false },
+                      lineNumbers: 'on',
+                      wordWrap: 'on',
+                      scrollBeyondLastLine: false,
+                      automaticLayout: true,
+                      tabSize: 2,
+                      padding: { top: 16 },
+                      renderLineHighlight: 'line',
+                      cursorBlinking: 'smooth',
+                      smoothScrolling: true,
+                    }}
+                  />
+                </div>
+
+                {/* AI 채팅 패널 */}
+                {showAIChat && (
+                  <div className="w-1/2">
+                    <AIChatPanel
+                      activeSection={activeSection}
+                      currentCode={currentValue}
+                      onInsertCode={handleInsertCode}
+                      isOpen={showAIChat}
+                      onToggle={() => setShowAIChat(false)}
+                      inline={true}
+                    />
+                  </div>
+                )}
               </div>
             </div>
 

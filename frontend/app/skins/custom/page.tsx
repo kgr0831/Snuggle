@@ -14,6 +14,7 @@ import {
   CustomSkinUpdateData,
   TEMPLATE_VARIABLES,
 } from '@/lib/api/skins'
+import AIChatPanel from '@/components/skin/AIChatPanel'
 import type { User } from '@supabase/supabase-js'
 
 interface Blog {
@@ -49,6 +50,7 @@ export default function CustomSkinEditorPage() {
   const [activeSection, setActiveSection] = useState<TemplateKey>('html_header')
   const [hasChanges, setHasChanges] = useState(false)
   const [showVariables, setShowVariables] = useState(false)
+  const [showAIChat, setShowAIChat] = useState(false)
 
   // 데이터 로드
   useEffect(() => {
@@ -122,6 +124,12 @@ export default function CustomSkinEditorPage() {
     setEditedData(prev => ({ ...prev, [key]: value }))
     setHasChanges(true)
   }, [])
+
+  // AI 생성 코드 삽입
+  const handleInsertCode = useCallback((code: string) => {
+    handleEditorChange(activeSection, code)
+    toast.showToast('코드가 에디터에 삽입되었습니다')
+  }, [activeSection, handleEditorChange, toast])
 
   // 저장
   const handleSave = async () => {
@@ -411,6 +419,15 @@ export default function CustomSkinEditorPage() {
           </div>
         )}
       </div>
+
+      {/* AI Chat Panel */}
+      <AIChatPanel
+        activeSection={activeSection}
+        currentCode={currentValue}
+        onInsertCode={handleInsertCode}
+        isOpen={showAIChat}
+        onToggle={() => setShowAIChat(!showAIChat)}
+      />
     </div>
   )
 }
