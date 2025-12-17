@@ -3,7 +3,6 @@
 import { useState, useEffect, useMemo, useCallback, useRef } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import dynamic from 'next/dynamic'
-import DOMPurify from 'dompurify'
 import {
   getMarketplaceSkins,
   downloadSkin,
@@ -23,87 +22,15 @@ import {
 } from '@/lib/api/skins'
 import { getVisitorCount } from '@/lib/api/blogs'
 import { renderTemplate, TemplateContext } from '@/lib/utils/templateRenderer'
+import { sanitizeHTML, scopeCSS, formatPreviewDate } from '@/lib/utils/sanitize'
 import Toast from '@/components/common/Toast'
+import AIChatPanel from '@/components/skin/AIChatPanel'
+import { TEMPLATE_SECTIONS } from './_constants/templateSections'
 import type { User } from '@supabase/supabase-js'
+import type { Blog, PreviewPost, PreviewCategory, TabType, TemplateKey } from '@/types/skin'
 
 // Monaco Editor 동적 로드 (SSR 비활성화)
 const MonacoEditor = dynamic(() => import('@monaco-editor/react'), { ssr: false })
-
-// DOMPurify 설정
-const ALLOWED_TAGS: string[] = [
-  'div', 'span', 'p', 'a', 'img', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6',
-  'ul', 'ol', 'li', 'br', 'hr', 'strong', 'em', 'b', 'i', 'u',
-  'header', 'footer', 'nav', 'main', 'aside', 'article', 'section',
-  'figure', 'figcaption', 'blockquote', 'pre', 'code',
-  'table', 'thead', 'tbody', 'tr', 'th', 'td', 'button', 'svg', 'path',
-]
-
-const ALLOWED_ATTR: string[] = [
-  'class', 'id', 'href', 'src', 'alt', 'title', 'style',
-  'data-post-id', 'data-blog-id', 'data-category-id',
-  'target', 'rel', 'width', 'height', 'loading',
-  'viewBox', 'fill', 'stroke', 'stroke-width', 'stroke-linecap', 'stroke-linejoin', 'd',
-]
-
-function sanitizeHTML(html: string): string {
-  if (typeof window === 'undefined') return ''
-  return DOMPurify.sanitize(html, { ALLOWED_TAGS, ALLOWED_ATTR, ALLOW_DATA_ATTR: true })
-}
-
-function sanitizeCSS(css: string): string {
-  const dangerousPatterns = [/expression\s*\(/gi, /javascript\s*:/gi, /behavior\s*:/gi, /@import\s+url\s*\(/gi]
-  let sanitized = css
-  for (const pattern of dangerousPatterns) {
-    sanitized = sanitized.replace(pattern, '/* blocked */')
-  }
-  return sanitized
-}
-
-// 미리보기용 데이터 타입
-interface PreviewPost {
-  id: string
-  title: string
-  content?: string
-  excerpt?: string
-  thumbnail_url?: string | null
-  created_at: string
-  view_count?: number
-  like_count?: number
-  blog_id: string
-  category?: { id: string; name: string }
-}
-
-interface PreviewCategory {
-  id: string
-  name: string
-}
-
-// 날짜 포맷 함수
-function formatPreviewDate(dateString: string): string {
-  const date = new Date(dateString)
-  return `${date.getFullYear()}년 ${date.getMonth() + 1}월 ${date.getDate()}일`
-}
-
-type TabType = 'all' | 'official' | 'community'
-type TemplateKey = 'html_head' | 'html_header' | 'html_post_list' | 'html_post_item' | 'html_post_detail' | 'html_sidebar' | 'html_footer' | 'custom_css'
-
-const TEMPLATE_SECTIONS: { key: TemplateKey; label: string; icon: string; description: string }[] = [
-  { key: 'html_head', label: 'Head', icon: '🔧', description: '메타태그, 폰트' },
-  { key: 'html_header', label: '헤더', icon: '📌', description: '상단 영역' },
-  { key: 'html_post_list', label: '목록', icon: '📋', description: '게시글 목록' },
-  { key: 'html_post_item', label: '아이템', icon: '📝', description: '반복 아이템' },
-  { key: 'html_post_detail', label: '상세', icon: '📄', description: '게시글 상세' },
-  { key: 'html_sidebar', label: '사이드바', icon: '📊', description: '사이드바' },
-  { key: 'html_footer', label: '푸터', icon: '📎', description: '하단 영역' },
-  { key: 'custom_css', label: 'CSS', icon: '🎨', description: '스타일시트' },
-]
-
-interface Blog {
-  id: string
-  name: string
-  description: string | null
-  thumbnail_url: string | null
-}
 
 export default function MarketplacePage() {
   const [user, setUser] = useState<User | null>(null)
@@ -127,8 +54,6 @@ export default function MarketplacePage() {
   const [editorWidth, setEditorWidth] = useState(50) // 퍼센트
   const [isResizing, setIsResizing] = useState(false)
 
-  // 미리보기 타입 (list: 목록, detail: 상세)
-  const [previewType, setPreviewType] = useState<'list' | 'detail'>('list')
 
   // 미리보기용 실제 데이터
   const [previewPosts, setPreviewPosts] = useState<PreviewPost[]>([])
@@ -139,10 +64,11 @@ export default function MarketplacePage() {
   // 커스텀 스킨 에디터 상태
   const [customSkin, setCustomSkin] = useState<BlogCustomSkin | null>(null)
   const [editedData, setEditedData] = useState<CustomSkinUpdateData>({})
-  const [activeSection, setActiveSection] = useState<TemplateKey>('html_header')
+  const [activeSection, setActiveSection] = useState<TemplateKey>('html_template')
   const [hasChanges, setHasChanges] = useState(false)
   const [saving, setSaving] = useState(false)
   const [showVariables, setShowVariables] = useState(false)
+  const [showAIChat, setShowAIChat] = useState(false)
 
   const [toast, setToast] = useState<{ message: string; type: 'success' | 'error'; visible: boolean }>({
     message: '',
@@ -161,6 +87,21 @@ export default function MarketplacePage() {
 
   const showToast = (message: string, type: 'success' | 'error' = 'success') => {
     setToast({ message, type, visible: true })
+  }
+
+  // 통합 기본 HTML 템플릿 생성 헬퍼 (CSS Grid 레이아웃용)
+  const getDefaultCombinedTemplate = () => {
+    const defaults = getDefaultTemplates()
+    // CSS Grid가 레이아웃을 처리하므로 요소들을 직접 나열
+    const combinedHtml = `${defaults.html_header}
+${defaults.html_post_list}
+${defaults.html_sidebar}
+${defaults.html_footer}`
+    return {
+      html_template: combinedHtml,
+      custom_css: defaults.custom_css,
+      is_active: false,
+    }
   }
 
   const hideToast = () => {
@@ -208,25 +149,36 @@ export default function MarketplacePage() {
               }
 
               setCustomSkin(skin)
-              // CSS가 비어있으면 기본 CSS 사용
+              // 기존 개별 섹션들을 하나의 html_template으로 병합
+              // CSS Grid 레이아웃을 위해 요소들을 래퍼 없이 직접 나열
+              const defaultCombined = getDefaultCombinedTemplate()
+
+              let mergedHtml = ''
+
+              // 통합 모드 감지: html_header에만 내용이 있고 다른 섹션들이 비어있으면 통합 모드
+              const isUnifiedMode = skin.html_header && !skin.html_post_list && !skin.html_sidebar && !skin.html_footer
+
+              if (isUnifiedMode) {
+                // 통합 모드: html_header를 그대로 사용
+                mergedHtml = skin.html_header
+              } else if (skin.html_header || skin.html_post_list || skin.html_sidebar) {
+                // 개별 섹션 모드: 요소들을 직접 나열 (CSS Grid가 레이아웃 처리)
+                mergedHtml = `${skin.html_header || ''}
+${skin.html_post_list || ''}
+${skin.html_sidebar || ''}
+${skin.html_footer || ''}`
+              }
+
+              const finalCss = skin.custom_css || defaultCombined.custom_css
+
               setEditedData({
-                html_head: skin.html_head || defaults.html_head,
-                html_header: skin.html_header || defaults.html_header,
-                html_post_list: skin.html_post_list || defaults.html_post_list,
-                html_post_item: skin.html_post_item || defaults.html_post_item,
-                html_post_detail: skin.html_post_detail || defaults.html_post_detail,
-                html_sidebar: skin.html_sidebar || defaults.html_sidebar,
-                html_footer: skin.html_footer || defaults.html_footer,
-                custom_css: skin.custom_css || defaults.custom_css,
+                html_template: mergedHtml || defaultCombined.html_template,
+                custom_css: finalCss,
                 is_active: skin.is_active,
-                use_default_header: skin.use_default_header,
-                use_default_sidebar: skin.use_default_sidebar,
-                use_default_footer: skin.use_default_footer,
               })
             } catch (err) {
               console.error('Failed to load custom skin:', err)
-              const defaults = getDefaultTemplates()
-              setEditedData(defaults)
+              setEditedData(getDefaultCombinedTemplate())
             }
 
             // 미리보기용 실제 데이터 조회
@@ -395,13 +347,36 @@ export default function MarketplacePage() {
     setHasChanges(true)
   }, [])
 
+  // AI 생성 디자인 자동 적용 (CSS만 - HTML은 유지)
+  const handleApplyDesign = useCallback((sections: Record<string, string>) => {
+    console.log('[handleApplyDesign] Received sections:', sections)
+
+    // CSS만 적용 (HTML 구조는 유지)
+    if (sections.custom_css) {
+      setEditedData(prev => ({ ...prev, custom_css: sections.custom_css }))
+      setHasChanges(true)
+      showToast('스타일이 적용되었습니다')
+    }
+  }, [])
+
   // 저장
   const handleSave = async () => {
     if (!userBlog) return
 
     setSaving(true)
     try {
-      const saved = await saveCustomSkin(userBlog.id, editedData)
+      // html_template을 기존 필드에 매핑 (html_header에 전체 HTML 저장)
+      const saveData: CustomSkinUpdateData = {
+        html_header: editedData.html_template,
+        html_post_list: '',
+        html_post_item: '',
+        html_post_detail: '',
+        html_sidebar: '',
+        html_footer: '',
+        custom_css: editedData.custom_css,
+        is_active: editedData.is_active,
+      }
+      const saved = await saveCustomSkin(userBlog.id, saveData)
       setCustomSkin(saved)
       setHasChanges(false)
       showToast('저장되었습니다')
@@ -435,8 +410,8 @@ export default function MarketplacePage() {
 
   // 기본 템플릿 불러오기
   const handleLoadDefault = (key: TemplateKey) => {
-    const defaults = getDefaultTemplates()
-    const defaultValue = defaults[key as keyof typeof defaults]
+    const defaultCombined = getDefaultCombinedTemplate()
+    const defaultValue = defaultCombined[key as keyof typeof defaultCombined]
     if (typeof defaultValue === 'string') {
       handleEditorChange(key, defaultValue)
       showToast('기본 템플릿을 불러왔습니다')
@@ -495,7 +470,7 @@ export default function MarketplacePage() {
 
   // 실시간 미리보기 렌더링
   const previewHtml = useMemo(() => {
-    if (!showEditor || !userBlog) return { header: '', content: '', sidebar: '', footer: '', css: '' }
+    if (!showEditor || !userBlog) return { full: '', css: '', cssVars: {} as Record<string, string> }
 
     // 첫 번째 게시글 (상세 미리보기용)
     const firstPost = previewPosts[0]
@@ -540,21 +515,58 @@ export default function MarketplacePage() {
       like_count: firstPost?.like_count || 0,
     }
 
-    const partials = { post_item: editedData.html_post_item || '' }
+    // html_template에서 post_item 파셜 추출 ({{> post_item}} 사용을 위해)
+    // 기본 post_item 템플릿 제공
+    const defaultPostItem = `<article class="post-item">
+  <a href="/post/{{post_id}}" class="post-link">
+    <div class="post-content">
+      <h3 class="post-title">{{post_title}}</h3>
+      <p class="post-excerpt">{{post_excerpt}}</p>
+      <div class="post-meta">
+        <span class="post-date">{{post_date}}</span>
+        <span class="meta-divider">·</span>
+        <span class="post-views">{{view_count}} 조회</span>
+        <span class="post-likes">{{like_count}} 좋아요</span>
+      </div>
+    </div>
+    {{#if thumbnail_url}}
+    <div class="post-thumbnail">
+      <img src="{{thumbnail_url}}" alt="{{post_title}}">
+    </div>
+    {{/if}}
+  </a>
+</article>`
+    const partials = { post_item: defaultPostItem }
 
-    // 미리보기 타입에 따라 콘텐츠 선택
-    const contentTemplate = previewType === 'list'
-      ? editedData.html_post_list || ''
-      : editedData.html_post_detail || ''
+    // CSS에서 :root 변수 추출
+    const extractCSSVariables = (css: string): Record<string, string> => {
+      const vars: Record<string, string> = {}
+      const rootMatch = css.match(/:root\s*\{([^}]+)\}/)
+      if (rootMatch) {
+        const declarations = rootMatch[1].match(/--[\w-]+\s*:\s*[^;]+/g)
+        if (declarations) {
+          declarations.forEach(decl => {
+            const [name, value] = decl.split(':').map(s => s.trim())
+            if (name && value) {
+              vars[name] = value
+            }
+          })
+        }
+      }
+      return vars
+    }
+
+    const cssVars = extractCSSVariables(editedData.custom_css || '')
+
+    // 통합 html_template을 렌더링 (HTML 구조 조작 없이 그대로 사용)
+    const renderedHtml = sanitizeHTML(renderTemplate(editedData.html_template || '', context, partials))
 
     return {
-      header: sanitizeHTML(renderTemplate(editedData.html_header || '', context, partials)),
-      content: sanitizeHTML(renderTemplate(contentTemplate, context, partials)),
-      sidebar: sanitizeHTML(renderTemplate(editedData.html_sidebar || '', context, partials)),
-      footer: sanitizeHTML(renderTemplate(editedData.html_footer || '', context, partials)),
-      css: sanitizeCSS(editedData.custom_css || ''),
+      full: renderedHtml,
+      css: scopeCSS(editedData.custom_css || '', '.custom-skin-preview-container'),
+      cssVars,
     }
-  }, [showEditor, editedData, userBlog, previewType, previewPosts, previewCategories, subscriberCount, visitorCount])
+  }, [showEditor, editedData, userBlog, previewPosts, previewCategories, subscriberCount, visitorCount])
 
   // 리사이즈 핸들러
   const handleMouseDown = useCallback((e: React.MouseEvent) => {
@@ -842,7 +854,7 @@ export default function MarketplacePage() {
               )}
 
               {/* Monaco 에디터 */}
-              <div className="flex-1">
+              <div className="flex-1 overflow-hidden">
                 <MonacoEditor
                   height="100%"
                   language={isCSS ? 'css' : 'html'}
@@ -894,61 +906,96 @@ export default function MarketplacePage() {
                   - 내부 스타일이 외부 다크모드 영향 받지 않도록 격리
                 */}
                 <div
-                  className="custom-skin-preview-container mx-auto min-h-full max-w-4xl overflow-hidden rounded-lg shadow-2xl ring-1 ring-black/10"
+                  className="custom-skin-preview-container mx-auto min-h-full w-full overflow-hidden rounded-lg shadow-2xl ring-1 ring-black/10"
                   data-theme="light"
                   style={{
-                    backgroundColor: '#ffffff',
-                    color: '#000000',
-                    // CSS 변수 명시적 설정 (라이트 모드 기본값)
-                    ['--blog-bg' as string]: '#ffffff',
-                    ['--blog-fg' as string]: '#000000',
-                    ['--blog-accent' as string]: '#000000',
-                    ['--blog-muted' as string]: '#666666',
-                    ['--blog-border' as string]: '#e5e5e5',
-                    ['--blog-card-bg' as string]: '#fafafa',
+                    backgroundColor: previewHtml?.cssVars?.['--blog-bg'] || '#ffffff',
+                    color: previewHtml?.cssVars?.['--blog-fg'] || '#000000',
+                    // CSS 변수 - AI 생성 값 또는 기본값 사용
+                    ['--blog-bg' as string]: previewHtml?.cssVars?.['--blog-bg'] || '#ffffff',
+                    ['--blog-fg' as string]: previewHtml?.cssVars?.['--blog-fg'] || '#000000',
+                    ['--blog-accent' as string]: previewHtml?.cssVars?.['--blog-accent'] || '#000000',
+                    ['--blog-muted' as string]: previewHtml?.cssVars?.['--blog-muted'] || '#666666',
+                    ['--blog-border' as string]: previewHtml?.cssVars?.['--blog-border'] || '#e5e5e5',
+                    ['--blog-card-bg' as string]: previewHtml?.cssVars?.['--blog-card-bg'] || '#fafafa',
                     colorScheme: 'light',
                   }}
                 >
-                  {/* 커스텀 CSS 주입 - scoped 스타일 */}
+                  {/* 커스텀 CSS 주입 - CSS Grid 레이아웃 강제 적용 */}
                   <style>{`
                     .custom-skin-preview-container,
                     .custom-skin-preview-container * {
                       color-scheme: light !important;
                     }
-                    ${previewHtml.css}
+                    /* CSS Grid 레이아웃: HTML 구조와 무관하게 적용 */
+                    .custom-skin-preview-container .custom-skin-content {
+                      display: grid !important;
+                      grid-template-columns: 1fr 320px !important;
+                      grid-template-rows: auto 1fr auto !important;
+                      grid-template-areas:
+                        "header header"
+                        "content sidebar"
+                        "footer footer" !important;
+                      gap: 0 2rem !important;
+                      max-width: 1280px !important;
+                      margin: 0 auto !important;
+                      min-height: 100vh !important;
+                    }
+                    .custom-skin-preview-container .blog-header {
+                      grid-area: header !important;
+                      max-width: none !important;
+                      width: 100% !important;
+                    }
+                    .custom-skin-preview-container .blog-sidebar {
+                      grid-area: sidebar !important;
+                      width: 100% !important;
+                      padding-top: 2.5rem !important;
+                    }
+                    .custom-skin-preview-container .blog-footer {
+                      grid-area: footer !important;
+                    }
+                    .custom-skin-preview-container .post-list,
+                    .custom-skin-preview-container .post-detail {
+                      grid-area: content !important;
+                      padding: 2.5rem 1.5rem !important;
+                    }
+                    /* blog-main-layout이 있는 경우 기존 flex 레이아웃 유지 */
+                    .custom-skin-preview-container .blog-main-layout {
+                      grid-column: 1 / -1 !important;
+                      grid-row: 2 !important;
+                      display: flex !important;
+                      flex-direction: row !important;
+                      gap: 2rem !important;
+                      padding: 2.5rem 1.5rem !important;
+                    }
+                    .custom-skin-preview-container .blog-main-layout .blog-content-area {
+                      flex: 1 !important;
+                      min-width: 0 !important;
+                    }
+                    .custom-skin-preview-container .blog-main-layout .blog-sidebar {
+                      width: 320px !important;
+                      flex-shrink: 0 !important;
+                      padding-top: 0 !important;
+                    }
+                    ${previewHtml?.css || ''}
                   `}</style>
 
-                  {/* 헤더 */}
-                  {previewHtml.header && (
-                    <div dangerouslySetInnerHTML={{ __html: previewHtml.header }} />
-                  )}
-
-                  {/* 메인 콘텐츠 */}
-                  <div className="flex gap-6 p-6">
-                    {/* 콘텐츠 영역 */}
-                    <div className="min-w-0 flex-1">
-                      {previewHtml.content ? (
-                        <div dangerouslySetInnerHTML={{ __html: previewHtml.content }} />
-                      ) : (
-                        <div className="flex h-40 items-center justify-center rounded-lg border-2 border-dashed" style={{ borderColor: '#e5e5e5' }}>
-                          <p className="text-sm" style={{ color: '#999999' }}>
-                            {previewType === 'list' ? '게시글 목록 템플릿을 작성하세요' : '게시글 상세 템플릿을 작성하세요'}
-                          </p>
-                        </div>
-                      )}
-                    </div>
-
-                    {/* 사이드바 */}
-                    {previewHtml.sidebar && (
-                      <div className="w-64 shrink-0">
-                        <div dangerouslySetInnerHTML={{ __html: previewHtml.sidebar }} />
+                  {/* 통합 HTML 템플릿 렌더링 (sanitizeHTML로 정화됨) */}
+                  {previewHtml.full ? (
+                    <div
+                      className="custom-skin-content"
+                      // eslint-disable-next-line react/no-danger -- content is sanitized via sanitizeHTML
+                      dangerouslySetInnerHTML={{ __html: previewHtml.full }}
+                    />
+                  ) : (
+                    <div className="flex h-64 items-center justify-center">
+                      <div className="text-center">
+                        <div className="mb-2 text-4xl">📝</div>
+                        <p className="text-sm" style={{ color: '#999999' }}>
+                          HTML 템플릿을 작성하세요
+                        </p>
                       </div>
-                    )}
-                  </div>
-
-                  {/* 푸터 */}
-                  {previewHtml.footer && (
-                    <div dangerouslySetInnerHTML={{ __html: previewHtml.footer }} />
+                    </div>
                   )}
                 </div>
               </div>
@@ -1889,7 +1936,7 @@ export default function MarketplacePage() {
 
                     return (
                       <div
-                        className="aspect-[16/10] overflow-auto rounded-b-xl"
+                        className="published-skin-preview-container aspect-[16/10] overflow-auto rounded-b-xl"
                         style={{
                           '--blog-bg': '#ffffff',
                           '--blog-fg': '#000000',
@@ -1901,7 +1948,7 @@ export default function MarketplacePage() {
                           color: 'var(--blog-fg)',
                         } as React.CSSProperties}
                       >
-                        <style>{selectedPublishedSkin.custom_css || ''}</style>
+                        <style>{scopeCSS(selectedPublishedSkin.custom_css || '', '.published-skin-preview-container')}</style>
                         <div
                           className="custom-skin-wrapper"
                           dangerouslySetInnerHTML={{
@@ -1956,6 +2003,16 @@ export default function MarketplacePage() {
         isVisible={toast.visible}
         onClose={hideToast}
       />
+
+      {/* 플로팅 AI 디자이너 (에디터 뷰에서만 표시) */}
+      {showEditor && userBlog && (
+        <AIChatPanel
+          onApplyDesign={handleApplyDesign}
+          isOpen={showAIChat}
+          onToggle={() => setShowAIChat(!showAIChat)}
+          currentSections={editedData}
+        />
+      )}
     </div>
   )
 }

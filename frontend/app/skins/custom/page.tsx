@@ -14,7 +14,244 @@ import {
   CustomSkinUpdateData,
   TEMPLATE_VARIABLES,
 } from '@/lib/api/skins'
+import { renderTemplate } from '@/lib/utils/templateRenderer'
+import AIChatPanel from '@/components/skin/AIChatPanel'
+import FramePreview from '@/components/skin/FramePreview'
 import type { User } from '@supabase/supabase-js'
+
+const MOCK_DATA = {
+  blog_name: 'Snuggle Blog',
+  blog_description: '개발자의 일상과 코딩 이야기',
+  profile_image: 'https://api.dicebear.com/7.x/avataaars/svg?seed=Felix',
+  post_count: 12,
+  visitor_count: 1234,
+  posts: [
+    {
+      post_id: '1',
+      post_title: '안녕하세요! 첫 번째 글입니다.',
+      post_excerpt: '블로그를 개설했습니다. 앞으로 좋은 글 많이 쓸게요!',
+      post_date: '2025.12.18',
+      thumbnail_url: 'https://picsum.photos/seed/1/800/400',
+      view_count: 42,
+      like_count: 10,
+      blog_id: 'mock-blog',
+    },
+    {
+      post_id: '2',
+      post_title: 'React와 Next.js로 블로그 만들기',
+      post_excerpt: 'Next.js 14 App Router를 사용하여 블로그를 구축하는 방법을 알아봅시다.',
+      post_date: '2025.12.17',
+      thumbnail_url: 'https://picsum.photos/seed/2/800/400',
+      view_count: 128,
+      like_count: 25,
+      blog_id: 'mock-blog',
+    },
+    {
+      post_id: '3',
+      post_title: '오늘의 코딩 꿀팁',
+      post_excerpt: '유용한 VS Code 단축키 모음집',
+      post_date: '2025.12.16',
+      view_count: 56,
+      like_count: 5,
+      blog_id: 'mock-blog',
+    }
+  ]
+}
+
+// 기본 HTML 템플릿
+function getDefaultHTMLTemplate(): string {
+  return `<!-- 헤더 -->
+<header class="blog-header">
+  <img src="{{profile_image}}" alt="프로필" class="profile-img">
+  <div class="blog-info">
+    <h1 class="blog-title">{{blog_name}}</h1>
+    <p class="blog-desc">{{blog_description}}</p>
+  </div>
+</header>
+
+<!-- 게시글 목록 -->
+<section class="post-grid">
+  {{#posts}}
+    {{> post_item}}
+  {{/posts}}
+</section>
+
+<!-- 게시글 아이템 (반복) -->
+<article class="post-card">
+  <a href="{{post_url}}">
+    <img src="{{thumbnail_url}}" alt="" class="post-card-thumbnail">
+  </a>
+  <div class="post-card-content">
+    <h3 class="post-card-title"><a href="{{post_url}}">{{post_title}}</a></h3>
+    <p class="post-card-excerpt">{{post_excerpt}}</p>
+    <time class="post-card-date">{{post_date}}</time>
+  </div>
+</article>
+
+<!-- 게시글 상세 -->
+<article class="post-detail">
+  <h1 class="post-detail-title">{{post_title}}</h1>
+  <time class="post-detail-date">{{post_date}}</time>
+  <div class="post-detail-content">{{{post_content}}}</div>
+</article>
+
+<!-- 사이드바 -->
+<aside class="sidebar">
+  <h3 class="sidebar-title">About</h3>
+  <p class="sidebar-text">{{blog_description}}</p>
+</aside>
+
+<!-- 푸터 -->
+<footer class="blog-footer">
+  <p>© {{blog_name}}</p>
+</footer>`
+}
+
+// 기본 CSS
+function getDefaultCSS(): string {
+  return `:root {
+  --bg: #fafafa;
+  --card: #ffffff;
+  --text: #18181b;
+  --text-secondary: #71717a;
+  --accent: #7c3aed;
+  --border: #e4e4e7;
+  --shadow: rgba(0,0,0,0.05);
+}
+
+.custom-skin-wrapper {
+  background: var(--bg);
+  color: var(--text);
+  min-height: 100vh;
+  font-family: 'Pretendard', -apple-system, sans-serif;
+}
+
+.blog-header {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  padding: 2rem;
+  background: var(--card);
+  border-bottom: 1px solid var(--border);
+}
+
+.profile-img {
+  width: 56px;
+  height: 56px;
+  border-radius: 50%;
+  object-fit: cover;
+}
+
+.blog-title {
+  font-size: 1.25rem;
+  font-weight: 700;
+  margin: 0;
+}
+
+.blog-desc {
+  font-size: 0.875rem;
+  color: var(--text-secondary);
+  margin: 0.25rem 0 0;
+}
+
+.post-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: 1.5rem;
+  padding: 2rem;
+}
+
+.post-card {
+  background: var(--card);
+  border-radius: 12px;
+  overflow: hidden;
+  border: 1px solid var(--border);
+  box-shadow: 0 4px 6px var(--shadow);
+  transition: transform 0.2s;
+}
+
+.post-card:hover {
+  transform: translateY(-4px);
+}
+
+.post-card-thumbnail {
+  width: 100%;
+  aspect-ratio: 16/9;
+  object-fit: cover;
+}
+
+.post-card-content {
+  padding: 1rem;
+}
+
+.post-card-title {
+  font-size: 1rem;
+  font-weight: 600;
+  margin: 0 0 0.5rem;
+}
+
+.post-card-excerpt {
+  font-size: 0.875rem;
+  color: var(--text-secondary);
+  margin: 0 0 0.75rem;
+}
+
+.post-card-date {
+  font-size: 0.75rem;
+  color: var(--text-secondary);
+}
+
+.post-detail {
+  max-width: 720px;
+  margin: 0 auto;
+  padding: 2rem;
+}
+
+.post-detail-title {
+  font-size: 2rem;
+  font-weight: 700;
+  margin: 0 0 0.5rem;
+}
+
+.post-detail-date {
+  font-size: 0.875rem;
+  color: var(--text-secondary);
+  margin-bottom: 2rem;
+  display: block;
+}
+
+.post-detail-content {
+  line-height: 1.8;
+}
+
+.sidebar {
+  background: var(--card);
+  border-radius: 12px;
+  padding: 1.5rem;
+  border: 1px solid var(--border);
+}
+
+.sidebar-title {
+  font-size: 0.875rem;
+  font-weight: 600;
+  margin: 0 0 0.75rem;
+}
+
+.sidebar-text {
+  font-size: 0.875rem;
+  color: var(--text-secondary);
+  margin: 0;
+}
+
+.blog-footer {
+  text-align: center;
+  padding: 2rem;
+  color: var(--text-secondary);
+  font-size: 0.875rem;
+  border-top: 1px solid var(--border);
+  background: var(--card);
+}`
+}
 
 interface Blog {
   id: string
@@ -22,16 +259,10 @@ interface Blog {
   description: string | null
 }
 
-type TemplateKey = 'html_head' | 'html_header' | 'html_post_list' | 'html_post_item' | 'html_post_detail' | 'html_sidebar' | 'html_footer' | 'custom_css'
+type TemplateKey = 'html_template' | 'custom_css'
 
 const TEMPLATE_SECTIONS: { key: TemplateKey; label: string; icon: string; description: string }[] = [
-  { key: 'html_head', label: 'Head', icon: '🔧', description: '메타태그, 외부 폰트/스크립트' },
-  { key: 'html_header', label: '헤더', icon: '📌', description: '상단 네비게이션 영역' },
-  { key: 'html_post_list', label: '게시글 목록', icon: '📋', description: '게시글 목록 페이지' },
-  { key: 'html_post_item', label: '게시글 아이템', icon: '📝', description: '목록에서 반복되는 아이템' },
-  { key: 'html_post_detail', label: '게시글 상세', icon: '📄', description: '게시글 상세 페이지' },
-  { key: 'html_sidebar', label: '사이드바', icon: '📊', description: '사이드바 영역' },
-  { key: 'html_footer', label: '푸터', icon: '📎', description: '하단 푸터 영역' },
+  { key: 'html_template', label: 'HTML', icon: '📄', description: '전체 HTML 템플릿' },
   { key: 'custom_css', label: 'CSS', icon: '🎨', description: '커스텀 스타일시트' },
 ]
 
@@ -46,9 +277,10 @@ export default function CustomSkinEditorPage() {
 
   const [customSkin, setCustomSkin] = useState<BlogCustomSkin | null>(null)
   const [editedData, setEditedData] = useState<CustomSkinUpdateData>({})
-  const [activeSection, setActiveSection] = useState<TemplateKey>('html_header')
+  const [activeSection, setActiveSection] = useState<TemplateKey>('html_template')
   const [hasChanges, setHasChanges] = useState(false)
   const [showVariables, setShowVariables] = useState(false)
+  const [showAIChat, setShowAIChat] = useState(false)
 
   // 데이터 로드
   useEffect(() => {
@@ -86,29 +318,34 @@ export default function CustomSkinEditorPage() {
         const skin = await getCustomSkin(blogData.id)
         if (skin) {
           setCustomSkin(skin)
+          // 기존 개별 섹션들을 하나의 html_template으로 병합
+          const mergedHtml = [
+            skin.html_header,
+            skin.html_post_list,
+            skin.html_post_item,
+            skin.html_post_detail,
+            skin.html_sidebar,
+            skin.html_footer,
+          ].filter(Boolean).join('\n\n')
+
           setEditedData({
-            html_head: skin.html_head,
-            html_header: skin.html_header,
-            html_post_list: skin.html_post_list,
-            html_post_item: skin.html_post_item,
-            html_post_detail: skin.html_post_detail,
-            html_sidebar: skin.html_sidebar,
-            html_footer: skin.html_footer,
+            html_template: mergedHtml || getDefaultHTMLTemplate(),
             custom_css: skin.custom_css,
             is_active: skin.is_active,
-            use_default_header: skin.use_default_header,
-            use_default_sidebar: skin.use_default_sidebar,
-            use_default_footer: skin.use_default_footer,
           })
         } else {
           // 기본 템플릿으로 초기화
-          const defaults = getDefaultTemplates()
-          setEditedData(defaults)
+          setEditedData({
+            html_template: getDefaultHTMLTemplate(),
+            custom_css: getDefaultCSS(),
+          })
         }
       } catch (err) {
         console.error('Failed to load custom skin:', err)
-        const defaults = getDefaultTemplates()
-        setEditedData(defaults)
+        setEditedData({
+          html_template: getDefaultHTMLTemplate(),
+          custom_css: getDefaultCSS(),
+        })
       }
 
       setLoading(false)
@@ -123,13 +360,64 @@ export default function CustomSkinEditorPage() {
     setHasChanges(true)
   }, [])
 
+  // AI 생성 디자인 자동 적용 (HTML + CSS)
+  const handleApplyDesign = useCallback((sections: Record<string, string>) => {
+    // LLM 아티팩트 제거 및 정제
+    const sanitize = (str: string) => str.replace(/<｜begin▁of▁sentence｜>/g, '').trim()
+
+    setEditedData(prev => {
+      const next = { ...prev }
+
+      // Unified Template 처리
+      if (sections.html_template) {
+        const cleanHtml = sanitize(sections.html_template)
+        // Preview와 Editor가 Unified Mode를 인식하도록 html_template 저장
+        next.html_template = cleanHtml
+
+        // 중요: Preview 렌더링을 위해 html_header에 매핑하고 나머지는 비움
+        // 통합 모드로 전환하기 위해 개별 섹션들을 모두 비웁니다.
+        next.html_header = cleanHtml
+        next.html_post_list = ''
+        next.html_sidebar = ''
+        next.html_footer = ''
+      }
+
+      if (sections.custom_css) {
+        next.custom_css = sanitize(sections.custom_css)
+      }
+
+      return next
+    })
+
+    // 템플릿 탭으로 이동
+    if (sections.html_template) {
+      setActiveSection('html_template') // 에디터 탭 전환
+    } else if (sections.custom_css) {
+      setActiveSection('custom_css')
+    }
+
+    setHasChanges(true)
+    toast.showToast('디자인이 적용되었습니다')
+  }, [toast])
+
   // 저장
   const handleSave = async () => {
     if (!blog) return
 
     setSaving(true)
     try {
-      const saved = await saveCustomSkin(blog.id, editedData)
+      // html_template을 기존 필드에 매핑 (html_header에 전체 HTML 저장)
+      const saveData: CustomSkinUpdateData = {
+        html_header: editedData.html_template,
+        html_post_list: '',
+        html_post_item: '',
+        html_post_detail: '',
+        html_sidebar: '',
+        html_footer: '',
+        custom_css: editedData.custom_css,
+        is_active: editedData.is_active,
+      }
+      const saved = await saveCustomSkin(blog.id, saveData)
       setCustomSkin(saved)
       setHasChanges(false)
       toast.showToast('저장되었습니다')
@@ -172,8 +460,10 @@ export default function CustomSkinEditorPage() {
 
     try {
       await resetCustomSkin(blog.id)
-      const defaults = getDefaultTemplates()
-      setEditedData(defaults)
+      setEditedData({
+        html_template: getDefaultHTMLTemplate(),
+        custom_css: getDefaultCSS(),
+      })
       setCustomSkin(null)
       setHasChanges(false)
       toast.showToast('초기화되었습니다')
@@ -185,12 +475,9 @@ export default function CustomSkinEditorPage() {
 
   // 기본 템플릿 불러오기
   const handleLoadDefault = (key: TemplateKey) => {
-    const defaults = getDefaultTemplates()
-    const defaultValue = defaults[key as keyof typeof defaults]
-    if (typeof defaultValue === 'string') {
-      handleEditorChange(key, defaultValue)
-      toast.showToast('기본 템플릿을 불러왔습니다')
-    }
+    const defaultValue = key === 'html_template' ? getDefaultHTMLTemplate() : getDefaultCSS()
+    handleEditorChange(key, defaultValue)
+    toast.showToast('기본 템플릿을 불러왔습니다')
   }
 
   if (loading) {
@@ -240,11 +527,10 @@ export default function CustomSkinEditorPage() {
           {/* 활성화 토글 */}
           <button
             onClick={handleToggle}
-            className={`flex items-center gap-2 rounded-lg px-3 py-1.5 text-sm font-medium transition-colors ${
-              editedData.is_active
-                ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400'
-                : 'bg-neutral-100 text-neutral-600 dark:bg-neutral-800 dark:text-neutral-400'
-            }`}
+            className={`flex items-center gap-2 rounded-lg px-3 py-1.5 text-sm font-medium transition-colors ${editedData.is_active
+              ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400'
+              : 'bg-neutral-100 text-neutral-600 dark:bg-neutral-800 dark:text-neutral-400'
+              }`}
           >
             <div className={`h-2 w-2 rounded-full ${editedData.is_active ? 'bg-emerald-500' : 'bg-neutral-400'}`} />
             {editedData.is_active ? '활성화됨' : '비활성화'}
@@ -281,11 +567,10 @@ export default function CustomSkinEditorPage() {
                 <button
                   key={section.key}
                   onClick={() => setActiveSection(section.key)}
-                  className={`flex w-full items-center gap-2.5 rounded-lg px-3 py-2 text-left transition-colors ${
-                    activeSection === section.key
-                      ? 'bg-neutral-100 text-neutral-900 dark:bg-neutral-800 dark:text-white'
-                      : 'text-neutral-600 hover:bg-neutral-50 dark:text-neutral-400 dark:hover:bg-neutral-800/50'
-                  }`}
+                  className={`flex w-full items-center gap-2.5 rounded-lg px-3 py-2 text-left transition-colors ${activeSection === section.key
+                    ? 'bg-neutral-100 text-neutral-900 dark:bg-neutral-800 dark:text-white'
+                    : 'text-neutral-600 hover:bg-neutral-50 dark:text-neutral-400 dark:hover:bg-neutral-800/50'
+                    }`}
                 >
                   <span className="text-base">{section.icon}</span>
                   <div className="min-w-0 flex-1">
@@ -316,36 +601,52 @@ export default function CustomSkinEditorPage() {
           </div>
         </div>
 
-        {/* 메인 에디터 영역 */}
-        <div className="flex flex-1 flex-col overflow-hidden">
-          {/* 에디터 헤더 */}
-          <div className="flex shrink-0 items-center justify-between border-b border-neutral-200 bg-neutral-100 px-4 py-2 dark:border-neutral-800 dark:bg-neutral-800">
-            <div className="flex items-center gap-2">
-              <span className="text-lg">{TEMPLATE_SECTIONS.find(s => s.key === activeSection)?.icon}</span>
-              <span className="text-sm font-medium text-neutral-900 dark:text-white">
-                {TEMPLATE_SECTIONS.find(s => s.key === activeSection)?.label}
-              </span>
-              <span className="rounded bg-neutral-200 px-1.5 py-0.5 text-xs text-neutral-500 dark:bg-neutral-700 dark:text-neutral-400">
-                {isCSS ? 'CSS' : 'HTML'}
-              </span>
+        {/* 중앙: 에디터 + 프리뷰 (Split View) */}
+        <div className="flex flex-1 overflow-hidden">
+          {/* 에디터 (왼쪽 or 상단) */}
+          <div className="flex flex-1 flex-col border-r border-neutral-200 dark:border-neutral-800">
+            {/* 에디터 헤더 */}
+            <div className="flex shrink-0 items-center justify-between border-b border-neutral-200 bg-neutral-100 px-4 py-2 dark:border-neutral-800 dark:bg-neutral-800">
+              <div className="flex items-center gap-2">
+                <span className="text-lg">{TEMPLATE_SECTIONS.find(s => s.key === activeSection)?.icon}</span>
+                <span className="text-sm font-medium text-neutral-900 dark:text-white">
+                  {TEMPLATE_SECTIONS.find(s => s.key === activeSection)?.label}
+                </span>
+                <span className="rounded bg-neutral-200 px-1.5 py-0.5 text-xs text-neutral-500 dark:bg-neutral-700 dark:text-neutral-400">
+                  {isCSS ? 'CSS' : 'HTML'}
+                </span>
+              </div>
+              <button
+                onClick={() => handleLoadDefault(activeSection)}
+                className="text-xs text-neutral-500 transition-colors hover:text-neutral-900 dark:text-neutral-400 dark:hover:text-white"
+              >
+                기본 템플릿 불러오기
+              </button>
             </div>
-            <button
-              onClick={() => handleLoadDefault(activeSection)}
-              className="text-xs text-neutral-500 transition-colors hover:text-neutral-900 dark:text-neutral-400 dark:hover:text-white"
-            >
-              기본 템플릿 불러오기
-            </button>
+
+            {/* 코드 에디터 */}
+            <div className="flex-1 overflow-hidden">
+              <textarea
+                value={currentValue}
+                onChange={(e) => handleEditorChange(activeSection, e.target.value)}
+                className="h-full w-full resize-none border-0 bg-neutral-900 p-4 font-mono text-sm leading-relaxed text-neutral-100 outline-none"
+                placeholder={isCSS ? '/* CSS 코드를 입력하세요 */' : '<!-- HTML 코드를 입력하세요 -->'}
+                spellCheck={false}
+              />
+            </div>
           </div>
 
-          {/* 코드 에디터 */}
-          <div className="flex-1 overflow-hidden">
-            <textarea
-              value={currentValue}
-              onChange={(e) => handleEditorChange(activeSection, e.target.value)}
-              className="h-full w-full resize-none border-0 bg-neutral-900 p-4 font-mono text-sm leading-relaxed text-neutral-100 outline-none"
-              placeholder={isCSS ? '/* CSS 코드를 입력하세요 */' : '<!-- HTML 코드를 입력하세요 -->'}
-              spellCheck={false}
-            />
+          {/* 프리뷰 (오른쪽) - FramePreview 사용 */}
+          <div className="hidden w-1/2 flex-col bg-neutral-100 dark:bg-black lg:flex">
+            <div className="flex shrink-0 items-center justify-between border-b border-neutral-200 bg-neutral-100 px-4 py-2 dark:border-neutral-800 dark:bg-neutral-800">
+              <span className="text-sm font-medium text-neutral-600 dark:text-neutral-400">Preview</span>
+            </div>
+            <div className="flex-1 p-4">
+              <FramePreview
+                html={renderTemplate(editedData.html_template || '', MOCK_DATA)}
+                css={editedData.custom_css || ''}
+              />
+            </div>
           </div>
         </div>
 
@@ -411,6 +712,14 @@ export default function CustomSkinEditorPage() {
           </div>
         )}
       </div>
+
+      {/* AI Chat Panel */}
+      <AIChatPanel
+        onApplyDesign={handleApplyDesign}
+        isOpen={showAIChat}
+        onToggle={() => setShowAIChat(!showAIChat)}
+        currentSections={editedData}
+      />
     </div>
   )
 }
